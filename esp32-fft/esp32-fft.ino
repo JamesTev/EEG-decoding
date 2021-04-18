@@ -26,6 +26,7 @@ extern "C"{
 #define GPIO_OUTPUT 27 //27
 
 double start, end;
+const int ledPin =  LED_BUILTIN;// the number of the LED pin
 
 timer_config_t timer_config = {
   .alarm_en = false,
@@ -212,7 +213,7 @@ void setup() {
   // put your setup code here, to run once:
   gpio_config(&gpio_conf);
   gpio_set_level(gpio_num_t(GPIO_OUTPUT), 0);
-
+  pinMode(ledPin, OUTPUT);
   clock_init();
 }
 
@@ -220,6 +221,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   fft_test_task();
   rfft_test_task();
+  digitalWrite(ledPin, !digitalRead(ledPin));
   //fft8_test_task();
   //fft4_test_task();
   vTaskDelay(1000 / portTICK_RATE_MS);

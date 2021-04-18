@@ -2,12 +2,12 @@ import numpy as np
 
 dB = lambda x: 10*np.log10(x) # convert mag. to dB
 
-def save_data_npz(fname, data):
+def save_data_npz(fname, data, **kwargs):
     
     if not isinstance(data, np.ndarray):
         data = data.values
     
-    np.savez(fname, data=data)
+    np.savez(fname, data=data, **kwargs)
     
 def load_df(fname, key='data', cols=None):
     if cols is None:

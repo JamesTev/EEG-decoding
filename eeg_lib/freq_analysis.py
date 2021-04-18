@@ -67,20 +67,28 @@ def decode_ssvep(Sxx, f, target_freqs, convert_to_mag=True, verbose=False):
 from scipy.fft import rfft, rfftfreq # real fft
 
 
-def plot_periodogram(x, ssvep_f0, fs, N=2048, figsize=(14,10)):
-    X = rfft(x.values, n=N)
+def plot_periodogram(x, fs, ssvep_f0=None, N=2048, figsize=(14,10), axes=None):
+    
+    N = min(N, len(x)-1)
+    
+    if not isinstance(x, np.ndarray):
+        x = x.values
+    X = rfft(x, n=N)
     Pxx_fft = np.abs(X)**2
     w1 = np.linspace(0, 1, N//2+1) # norm freq (pi rad/sample)
     f1 = w1*fs/2 # pi rad/sample corresponds to fs/2
 
-    welch_wins = [N//2, N//1.5]
+    welch_wins = [N//2]
     Pxx_welch_mat = np.zeros((len(welch_wins), N//2+1))
 
     for i, win in enumerate(welch_wins):
         f_welch, Pxx_welch = signal.welch(x, fs, nperseg=win, nfft=N) # nperseg = welch window len
         Pxx_welch_mat[i, :] = dB(Pxx_welch)
 
-    fig, (ax0, ax1) = plt.subplots(2,1, figsize=figsize)
+    if axes is None:
+        fig, (ax0, ax1) = plt.subplots(2,1, figsize=figsize)
+    else:
+        ax0, ax1 = axes
 
     ax0.plot(f1, dB(Pxx_fft))
     ax0.set_title('Estimated PSD: Standard Periodogram')
@@ -91,14 +99,17 @@ def plot_periodogram(x, ssvep_f0, fs, N=2048, figsize=(14,10)):
     for ax in (ax0, ax1):
         ax.set_xlabel('frequency (Hz)')
         ax.set_ylabel('PSD (dB)')
-        ax.axvline(ssvep_f0, ls=':', lw=1.5, color='r')
+      
         x_max = 60
         ax.set_xlim(0, x_max)
         ax.set_xticks(np.arange(0, x_max, step=2))
+        if ssvep_f0 is not None:
+            ax.axvline(ssvep_f0, ls=':', lw=1.5, color='r', label='expected $f^{(0)}_{SSVEP}$')
+            print(f'Fundamental SSVEP frequency expected at {ssvep_f0}Hz')
+            ax.legend()
         ax.grid()
         
     plt.tight_layout(pad=1)
-    print(f'Fundamental SSVEP frequency expected at {ssvep_f0}Hz')
 
 
 def stft(x, Nwin, Nfft=None):
