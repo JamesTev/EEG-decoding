@@ -23,7 +23,9 @@ class WebSocketServer:
         self._max_connections = max_connections
         self._page = page
 
-    def _setup_conn(self, port):
+    def _setup_conn(self, port, attempt_wifi_conn=True):
+        from lib.utils import connect_wifi
+        
         self._listen_s = socket.socket()
         self._listen_s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._listen_poll = uselect.poll()
@@ -34,10 +36,14 @@ class WebSocketServer:
         self._listen_s.bind(addr)
         self._listen_s.listen(1)
         self._listen_poll.register(self._listen_s)
+        
+        connect_wifi()
+        
         for i in (network.AP_IF, network.STA_IF):
             iface = network.WLAN(i)
             if iface.active():
                 print("WebSocket started on ws://%s:%d" % (iface.ifconfig()[0], port))
+                return iface
 
     def _check_new_connections(self, accept_handler):
         poll_events = self._listen_poll.poll(0)
