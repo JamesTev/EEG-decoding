@@ -1,4 +1,5 @@
 import numpy as np
+import glob
 
 dB = lambda x: 10*np.log10(x) # convert mag. to dB
 
@@ -22,3 +23,18 @@ def standardise(X):
 def resample(X, factor):
     idx_rs = np.arange(0, len(X)-1, factor)
     return X[idx_rs]
+
+def load_trials(path_pattern, verbose=False):
+    all_files = glob.glob(path_pattern)
+    data = []
+    
+    min_len = 10e6 # trials lengths will be very similar but may differ by 1 or 2 samples
+    for filename in all_files:
+        if verbose:
+            print(f"Loading file {filename}")
+        f = np.load(filename, allow_pickle=True)
+        data.append(f['data'])
+        if len(f['data']) < min_len:
+            min_len = len(f['data'])
+    
+    return np.array([trial[:min_len-1] for trial in data])

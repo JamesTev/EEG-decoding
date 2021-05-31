@@ -39,7 +39,7 @@ class GCCA():
             self.Chi_bar.append(Chi_bar_n)
             Chi_bar_n_c = np.concatenate([Chi_bar_n for i in range(self.Nt)], axis=1) # concat along columns
 
-            Y_n = cca_reference([self.stim_freqs[n]], self.fs, self.Ns, num_harms=self.Nh).reshape(-1, self.Ns)
+            Y_n = cca_reference([self.stim_freqs[n]], self.fs, self.Ns, Nh=self.Nh).reshape(-1, self.Ns)
             self.Y.append(Y_n)
             Y_n_c = np.concatenate([Y_n for i in range(self.Nt)], axis=1)
 
@@ -54,7 +54,7 @@ class GCCA():
             A = np.linalg.inv(D).dot(X.dot(X.T))
             lam, W_eig = np.linalg.eig(A)
 
-            i = np.argmax(lam)
+            i = np.argmax(np.real(lam))
             W.append(W_eig[:, i]) # optimal spatial filter vector with dim (2*Nc + 2*Nh)
         
         self.Chi_bar = np.array(self.Chi_bar) # form tensors 
