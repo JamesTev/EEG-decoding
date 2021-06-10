@@ -1,7 +1,7 @@
 """
 A set of functions to generate synthetic signals that mimic EEG signals. In particular, SSVEP sinsusoidal signals embedded in noise.
 """
-
+from .utils import standardise_ssvep_tensor
 import numpy as np
 
 def synth_x(f, Ns, noise_power=0.5, fs=250):
@@ -15,7 +15,7 @@ def synth_x(f, Ns, noise_power=0.5, fs=250):
     t = np.arange(0, Ns/fs, step=1/fs)
     return np.sin(2*np.pi*f*t)+np.random.normal(size=Ns, loc=0, scale=noise_power)
 
-def synth_X(f, Nc, Ns, noise_power=0.5, fs=200, f_std=0.025, noise_std=0.25):
+def synth_X(f, Nc, Ns, noise_power=0.5, fs=200, f_std=0.02, noise_std=0.2):
     """
     Generate a matrix of several variations of the same target signal. This is used
     to simulate the measurement of a common signal over multiple EEG channels 
@@ -42,9 +42,9 @@ def synth_X(f, Nc, Ns, noise_power=0.5, fs=200, f_std=0.025, noise_std=0.25):
         
     return np.array(X)
 
-def synth_GCCA_tensor(stim_freqs, Ns, Nc, Nt, noise_power, fs, Nh=3):
+def synth_data_tensor(stim_freqs, Ns, Nc, Nt, noise_power, fs, Nh=3):
     """
-    Generate a synthetic 4th order tensor (Chi) of dim. Nf x Nc x Ns x Nt for GCC analysis
+    Generate a synthetic 4th order tensor (Chi) of dim. Nf x Nc x Ns x Nt 
     
     args:
     stim_freqs [float]: stimulus frequencies of interest (SSVEP). `Nf = len(stim_freqs)`
@@ -58,4 +58,5 @@ def synth_GCCA_tensor(stim_freqs, Ns, Nc, Nt, noise_power, fs, Nh=3):
     out_tensor = []
     for f in stim_freqs:
         out_tensor.append(np.array([synth_X(f, Nc, Ns, noise_power=noise_power) for i in range(Nt)]).transpose(1, 2, 0))
-    return np.array(out_tensor)
+    X = np.array(out_tensor)
+    return standardise_ssvep_tensor(X)

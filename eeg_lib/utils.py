@@ -20,6 +20,21 @@ def standardise(X):
     axis = np.argmax(X.shape)
     return (X-np.mean(X, axis=axis))/np.std(X, axis=axis)
 
+def standardise_ssvep_tensor(X):
+    # Given a obs matrix for given f, and trial, rows (channels) should all be zero mean and unit std dev
+
+    Nf, Nc, Ns, Nt = X.shape
+
+    for n in range(Nf):
+        for t in range(Nt):
+            obs = X[n, :, :, t]
+            mu = np.broadcast_to(obs.mean(axis=1), (Ns, Nc)).T
+            sigma = np.broadcast_to(obs.std(axis=1), (Ns, Nc)).T
+            X[n, :, :, t] = (obs-mu)/sigma
+    
+    return X
+
+
 def resample(X, factor):
     idx_rs = np.arange(0, len(X)-1, factor)
     return X[idx_rs]

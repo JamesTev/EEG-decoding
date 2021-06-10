@@ -3,6 +3,7 @@ from sklearn.cross_decomposition import CCA as CCA_sklearn
 from .filtering import filterbank
 import numpy as np
 
+import scipy
 from scipy.stats import pearsonr
 from scipy.linalg import block_diag
 
@@ -18,16 +19,23 @@ class GCCA():
     Sun, Chen et al
     """
     
-    def __init__(self, data, stim_freqs, fs, Nh=3, W=None):
-        assert len(data.shape) == 4, "Expected 4th order input data tensor: Nf x Nc x Ns x Nt"
-        self.Nf, self.Nc, self.Ns, self.Nt = data.shape
+    def __init__(self, stim_freqs, fs, Nh=3, W=None):
+        self.Nf, self.Nc, self.Ns, self.Nt = None, None, None, None
         self.Nh = Nh
-        self.Chi = data
         self.W = W
         self.stim_freqs = stim_freqs
         self.fs = fs
         
-    def fit(self):
+    def fit(self, X):
+        """
+        Fit against training tensor X.
+        
+        X should be a 4th order tensor of dim (Nf x Nc x Ns x Nt)
+        """
+        assert len(X.shape) == 4, "Expected 4th order input data tensor: Nf x Nc x Ns x Nt"
+        self.Chi = X
+        self.Nf, self.Nc, self.Ns, self.Nt = X.shape
+        
         W = []
         self.Chi_bar = []
         self.Y = []
@@ -81,6 +89,77 @@ class GCCA():
             rho_n = sum([np.sign(rho_i)*rho_i**2 for rho_i in [rho1, rho2]])
             result[self.stim_freqs[i]] = rho_n
         return result
+    
+class MsetCCA():
+    """
+    Multi set CCA
+    
+    Ref: FREQUENCY RECOGNITION IN SSVEP-BASED BCI USING MULTISET CANONICAL CORRELATION ANALYSIS, Zhang, Zhou et al
+    """
+    
+    def __init__(self):
+        self.Nc, self.Ns, self.Nt = None, None, None
+        
+    def fit(self, chi):
+        """
+        Fit against training tensor chi.
+        
+        chi should be a 4th order tensor of dim (Nc x Ns x Nt)
+        """
+        assert len(chi.shape) == 3, "Expected 3rd order input data tensor for freq. fm: Nc x Ns x Nt"
+        
+        Nc, Ns, Nt = chi.shape
+        
+        chi_c = np.vstack([chi[:, :, i] for i in range(Nt)])
+        R = chi_c.dot(chi_c.T)
+
+        # form inra-trial covariance matrix S
+        blocks = [chi[:, :, i].dot(chi[:, :, i].T) for i in range(Nt)]
+        S = block_diag(*blocks)
+
+        lam, V = scipy.linalg.eig((R-S), b=S) # solve generalise eig value problem
+        w = V[:, np.argmax(lam)].reshape((Nt, Nc)) # sort by largest eig vals in lam vector. TODO: check reshaping
+
+        self.Y = np.array([w[i, :].T.dot(chi[:, :, i]) for i in range(Nt)]) # form optimised reference matrix
+        self.Nc, self.Ns, self.Nt = Nc, Ns, Nt
+            
+    def compute_corr(self, X_test, method='cca'):
+        if self.Y is None:
+            raise ValueError("Reference matrix Y must be computed using `fit` before computing corr")
+        if method == 'eig':
+            rho = CCA.cca_eig(X_test.T, self.Y.T)[0]
+        else: # use sklearn implementation
+            cca = CCA_sklearn(n_components=1)
+            Xc, Yc = cca.fit_transform(X_test.T, self.Y.T)
+            rho = pearsonr(Xc[:, 0], Yc[:, 0])[0]
+        return rho
+
+class MsetCCA_SSVEP():
+    
+    def __init__(self, stim_freqs):
+        self.stim_freqs = stim_freqs
+        self.models = {f: MsetCCA() for f in stim_freqs} # init independent TRCA models per stim freq
+
+    def fit(self, X_ssvep):
+        '''
+        Fit the independent Nf TRCA models using input data tensor `X_ssvep`
+        
+        :param 
+        X_ssvep: 4th order data tensor (Nf x Nc x Ns x Nt)
+        '''
+        assert len(X_ssvep.shape) == 4, "Expected a 4th order data tensor with shape (Nf x Nc x Ns x Nt)"
+        assert len(self.stim_freqs) == X_ssvep.shape[0], "Length of supplied stim freqs does not match first dimension of input data"
+        
+        for i, f in enumerate(self.stim_freqs):
+            self.models[f].fit(X_ssvep[i, :, :, :])
+    
+    def classify(self, X_test, method='cca'):
+        assert len(X_test.shape) == 2, "Expected a matrix with shape (Nc x Ns)"
+        
+        return {f: self.models[f].compute_corr(X_test, method=method) for f in self.stim_freqs}
+    
+    def get_eig(self):
+        return {f: self.models[f].get_eig() for f in self.stim_freqs}
     
 class CCA():
     

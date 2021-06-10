@@ -1,34 +1,77 @@
 import numpy as np
+from scipy.stats import pearsonr
 
-# Task-related component analysis for functional neuroimaging and application to near-infrared spectroscopy data, Tanaka et al
+# Task-related component analysis: Tanaka et al
+class TRCA(): 
+    
+    def __init__(self):
+        self.W = None
+        self.lam = None
+        self.Y = None
+        self.X = None
+    
+    def fit(self, X):
+        '''
+        :param 
+        X: data tensor (Nc x Ns x Nt)
+        '''
+        Nc, Ns, Nt = X.shape
 
-def trca(X, t1, Nexp):
-    '''
-    :param X: data matrix (N channels * T time points)
-    :param t1: task onsets (vector)
-    :param Nexp: task duration (sampling unit)
-    :return:
-    '''
-    nb_channel = X.shape[0]
-    nb_trial = t1.shape[0]
+        S = np.zeros((Nc, Nc)) # inter-trial (inter-block) covariance matrix
 
-    S = np.zeros((nb_channel, nb_channel))
+        # computation of correlation matrices:
+        for i in range(Nc):
+            for j in range(Nc):
+                for k in range(Nt):
+                    for l in range(Nt):
+                        if k != l: # compare blocks (trials) l and k 
+                            xi = X[i, :, k].reshape(1,-1)
+                            xj = X[j, :, l].reshape(1,-1)
+                            S[i,j] += np.dot((xi-np.mean(xi, axis=1)),(xj-np.mean(xj,axis=1)).T)
 
-    # computation of correlation matrices:
-    for i in range(nb_channel):
-        for j in range(nb_channel):
-            for k in range(nb_trial):
-                for l in range(nb_trial):
-                    if k != l:
-                        tk =t1[k] # onset of k-th block
-                        tl =t1[l] # onset of l-th block
-                        xi = X[i,tk:tk+Nexp].reshape(1,Nexp)
-                        xj = X[j,tl:tl+Nexp].reshape(1,Nexp)
-                        S[i,j] += np.dot((xi-np.mean(xi, axis=1)),(xj-np.mean(xj,axis=1)).T)
+        X_bar = X.reshape((Nc, Ns*Nt)) - np.tile(X.reshape((Nc, Ns*Nt)).mean(axis=1).reshape(Nc,1),(1, Ns*Nt))
+        
+        Q = np.dot(X_bar, X_bar.T) # Nc x Nc data covariance matrix
+        lam, W = np.linalg.eig(np.dot(np.linalg.inv(Q), S))
+        
+        i = np.argsort(np.real(lam))[::-1] # get order of largest eigenvalues in lam
+        
+        self.X = X
+        self.W = W[:, i]
+        self.lam = lam[i]
+        self.Y = np.dot(self.W[:, 0].T, X_bar)
+        
+    def compute_corr(self, X_test):
+        X_av = self.X.mean(axis=-1)
+        w = self.W[:, 0] # get eig. vector corresp to largest eig val
+        return pearsonr(np.squeeze(w.T.dot(X_test)), np.squeeze(np.squeeze(w.T.dot(X_av))))[0]
+    
+    def get_eig(self):
+        return self.lam, self.W
+    
+class TRCA_SSVEP():
+    
+    def __init__(self, stim_freqs):
+        self.stim_freqs = stim_freqs
+        self.models = {f: TRCA() for f in stim_freqs} # init independent TRCA models per stim freq
 
-    X_aver = X - np.tile(np.mean(X, axis=1).reshape(nb_channel,1),(1, X.shape[1]))
-    Q = np.dot(X_aver, X_aver.T)
-    D, V = np.linalg.eig(np.dot(np.linalg.inv(Q), S))
-    Y = np.dot(V.T, X_aver)
-
-    return Y, V, D, S
+    def fit(self, X_ssvep):
+        '''
+        Fit the independent Nf TRCA models using input data tensor `X_ssvep`
+        
+        :param 
+        X_ssvep: 4th order data tensor (Nf x Nc x Ns x Nt)
+        '''
+        assert len(X_ssvep.shape) == 4, "Expected a 4th order data tensor with shape (Nf x Nc x Ns x Nt)"
+        assert len(self.stim_freqs) == X_ssvep.shape[0], "Length of supplied stim freqs does not match first dimension of input data"
+        
+        for i, f in enumerate(self.stim_freqs):
+            self.models[f].fit(X_ssvep[i, :, :, :])
+    
+    def compute_corr(self, X_test):
+        assert len(X_test.shape) == 2, "Expected a matrix with shape (Nc x Ns)"
+        
+        return {f: self.models[f].compute_corr(X_test) for f in self.stim_freqs}
+    
+    def get_eig(self):
+        return {f: self.models[f].get_eig() for f in self.stim_freqs}

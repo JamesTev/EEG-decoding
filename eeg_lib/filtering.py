@@ -41,7 +41,22 @@ def butter_notch(y, f0, fs, order=2):
     
     return y_filt
 
+def iir_bandpass_ssvep_tensor(X, f0, f1, fs, order=4, ftype='cheby2'):
+    """
+    Perform IIR bandpass over SSVEP frequency band.
+    
+    Expects 4th order data tensor X in form: Nf x Nc X Ns x Nt
+    """
+    X_f = np.zeros_like(X)
+    Nf, Nc, Ns, Nt = X.shape
+    
+    bp_filt = lambda x: iir_bandpass(x, f0, f1, fs, order=order, ftype=ftype)
 
+    for trial in range(Nt): # TODO parallelise or similar
+        for f_idx in range(Nf):
+            X_i = X[f_idx, :, :, trial]
+            X_f[f_idx, :, :, trial] = np.array([bp_filt(X_i[chan, :]) for chan in range(Nc)])
+    return X_f
 
 def filterbank(eeg, fs, idx_fb):    
     if idx_fb == None:
