@@ -3,11 +3,10 @@ from sklearn.cross_decomposition import CCA as CCA_sklearn
 from .filtering import filterbank
 import numpy as np
 
-import scipy
 from scipy.stats import pearsonr
 from scipy.linalg import block_diag
 
-from .utils import resample, standardise
+from .utils import resample, standardise, solve_gen_eig_prob
 
 np.random.seed(0)
 
@@ -59,8 +58,7 @@ class GCCA():
             d3 = Y_n_c.dot(Y_n_c.T)
             D = block_diag(d1, d2, d3)
 
-            A = np.linalg.inv(D).dot(X.dot(X.T))
-            lam, W_eig = np.linalg.eig(A)
+            lam, W_eig = solve_gen_eig_prob(X.dot(X.T), D) # solve generalised eigenvalue problem
 
             i = np.argmax(np.real(lam))
             W.append(W_eig[:, i]) # optimal spatial filter vector with dim (2*Nc + 2*Nh)
@@ -117,7 +115,7 @@ class MsetCCA():
         blocks = [chi[:, :, i].dot(chi[:, :, i].T) for i in range(Nt)]
         S = block_diag(*blocks)
 
-        lam, V = scipy.linalg.eig((R-S), b=S) # solve generalise eig value problem
+        lam, V = solve_gen_eig_prob((R-S), S) # solve generalise eig value problem
         w = V[:, np.argmax(lam)].reshape((Nt, Nc)) # sort by largest eig vals in lam vector. TODO: check reshaping
 
         self.Y = np.array([w[i, :].T.dot(chi[:, :, i]) for i in range(Nt)]) # form optimised reference matrix
