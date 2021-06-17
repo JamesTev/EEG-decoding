@@ -1,4 +1,5 @@
 from ulab import numpy as np
+import urandom
 
 def solve_gen_eig_prob(A, B, eps=1e-8):
     """
@@ -27,6 +28,58 @@ def solve_gen_eig_prob(A, B, eps=1e-8):
     
     return np.diag(Lam), Phi
 
+def solve_eig_qr(A, n_eig, lam_iterations=5):
+    Ak = A
+    n_eig = min(n_eig, min(A.shape()))
+
+    for k in range(lam_iterations):
+        Qk, Rk = np.linalg.qr(Ak)
+        Ak = np.dot(Rk, Qk.transpose())
+
+    lam = np.diag(Ak) # get eigenvalues
+    V = []
+    for l in lam[:n_eig]: # now find `n_eig` eigenvectors
+        A_null = (A - np.eye(A.shape()[0])*l).transpose()
+        Q, R = np.linalg.qr(A_null) # compute null space of (A-lam*I) to get eigenvector
+        Q = Q.transpose()
+        V.append(Q[:, -1])
+    return lam, np.array(V).transpose()
+
+def power_iteration(A, iterations):
+    """
+    Iterative algo. to find the eigenvector of a matrix A corresponding to the largest
+    eigenvalue.
+    
+    TODO: Establish some measure or heuristic of min number of iterations required
+    """
+    # choose random initial vector to reduce risk of choosing one orthogonal to 
+    # target eigen vector
+    b_k = np.array([urandom.random() for i in range(len(A))])
+
+    for _ in range(iterations):
+        b_k1 = np.dot(A, b_k)
+        b_k1_norm = np.linalg.norm(b_k1)
+        # re normalize the vector
+        b_k = b_k1 / b_k1_norm
+
+    return b_k1_norm, b_k
+
+def max_eig(A, power_iterations=50):
+    """
+    Function to return the largest eigenvalue of a matrix and its corresponding eigenvector.
+    
+    A must be square but need not be symmetric. Tries to first use uLab `np.linalg.eig`
+    that is better optimised but requires a symmetric matrix. Failing this, power iteration 
+    algorithm is used.
+    """
+    try:
+        lam, V = np.linalg.eig(A)
+        v = V[:, np.argmax(lam)]
+    except ValueError:
+        lam, v = power_iteration(A, power_iterations)
+        
+    return lam, v
+        
 def resample(X, factor):
     idx_rs = np.arange(0, len(X)-1, factor)
     return X[idx_rs]

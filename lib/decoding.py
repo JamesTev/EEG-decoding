@@ -1,26 +1,28 @@
 
 from ulab import numpy as np
 
-from .computation import corr, solve_gen_eig_prob, standardise
+from .computation import corr, max_eig, standardise
     
 class CCA():
     
-    def __init__(self, stim_freqs, fs, Nh=3):
+    def __init__(self, stim_freqs, fs, Nh=2):
         self.Nh = Nh
         self.stim_freqs = stim_freqs
         self.fs = fs
         
     def compute_corr(self, X_test):            
         result = {}
+        Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
         for f in self.stim_freqs:
             Y = harmonic_reference(f, self.fs, np.max(X_test.shape()), Nh=self.Nh, standardise_out=True)
-            rho = self.cca_eig(X_test, Y)[0] # canonical variable matrices. Xc = X^T.W_x
+            rho = self.cca_eig(X_test, Y, Cxx=Cxx) # canonical variable matrices. Xc = X^T.W_x
             result[f] = rho
         return result
     
     @staticmethod
-    def cca_eig(X, Y, n_components=1):
-        Cxx = np.dot(X, X.transpose()) # auto correlation matrix
+    def cca_eig(X, Y, Cxx=None):
+        if Cxx is None:
+            Cxx = np.dot(X, X.transpose()) # auto correlation matrix
         Cyy = np.dot(Y, Y.transpose()) 
         Cxy = np.dot(X, Y.transpose()) # cross correlation matrix
         Cyx = np.dot(Y, X.transpose()) # same as Cxy.T
@@ -28,9 +30,8 @@ class CCA():
         M1 = np.dot(np.linalg.inv(Cxx), Cxy) # intermediate result
         M2 = np.dot(np.linalg.inv(Cyy), Cyx)
 
-        M = np.dot(M1, M2)
-        lam, _ = np.linalg.eig(M)
-        return sorted(np.sqrt(lam), reverse=True)[:n_components] # return largest n sqrt eig vals
+        lam, _ = max_eig(np.dot(M1, M2))
+        return np.sqrt(lam)
     
 def harmonic_reference(f0, fs, Ns, Nh=2, standardise_out=False):
     
