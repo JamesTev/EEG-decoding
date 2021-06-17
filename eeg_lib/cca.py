@@ -286,7 +286,7 @@ def cca_reference(list_freqs, fs, Ns, Nh=3, standardise_out=False):
                        np.cos(2*np.pi*tidx*harm_i*stim_freq)])
         y_ref[freq_i] = tmp # 2*num_harms because include both sin and cos
     
-    y_ref = np.squeeze(y_ref).T
+    y_ref = np.squeeze(y_ref)
     if standardise_out: # zero mean, unit std. dev
         return standardise(y_ref)
     return y_ref
