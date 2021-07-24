@@ -1,7 +1,8 @@
 
 from ulab import numpy as np
+import gc
 
-from .computation import corr, max_eig, standardise
+from .computation import solve_eig_qr, standardise
     
 class CCA():
     
@@ -14,7 +15,7 @@ class CCA():
         result = {}
         Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
         for f in self.stim_freqs:
-            Y = harmonic_reference(f, self.fs, np.max(X_test.shape()), Nh=self.Nh, standardise_out=True)
+            Y = harmonic_reference(f, self.fs, np.max(X_test.shape()), Nh=self.Nh, standardise_out=False)
             rho = self.cca_eig(X_test, Y, Cxx=Cxx) # canonical variable matrices. Xc = X^T.W_x
             result[f] = rho
         return result
@@ -30,10 +31,10 @@ class CCA():
         M1 = np.dot(np.linalg.inv(Cxx), Cxy) # intermediate result
         M2 = np.dot(np.linalg.inv(Cyy), Cyx)
 
-        lam, _ = max_eig(np.dot(M1, M2))
+        lam, _ = solve_eig_qr(np.dot(M1, M2), 20)
         return np.sqrt(lam)
     
-def harmonic_reference(f0, fs, Ns, Nh=2, standardise_out=False):
+def harmonic_reference(f0, fs, Ns, Nh=1, standardise_out=False):
     
     '''
     Generate reference signals for canonical correlation analysis (CCA)
@@ -47,15 +48,16 @@ def harmonic_reference(f0, fs, Ns, Nh=2, standardise_out=False):
     Output:
       y_ref           : Generated reference signals with shape (Nf, Ns, 2*Nh)
     '''  
-
-    tidx = np.arange(1,Ns+1)*(1/fs) #time index
+    X = np.zeros((Nh*2, Ns))
     
-    tmp = []
-    for harm_i in range(1,Nh+1):
+    for harm_i in range(Nh):
         # Sin and Cos
-        tmp.extend([np.sin(tidx*2*np.pi*harm_i*f0),
-                    np.cos(tidx*2*np.pi*harm_i*f0)])
-    y_ref = np.array(tmp)
+        X[2*harm_i, :] = np.sin(np.arange(1,Ns+1)*(1/fs)*2*np.pi*(harm_i+1)*f0)
+        gc.collect()
+        X[2*harm_i+1, :] = np.cos(np.arange(1,Ns+1)*(1/fs)*2*np.pi*(harm_i+1)*f0)
+        gc.collect()
+
+    # print(micropython.mem_info(1))
     if standardise_out: # zero mean, unit std. dev
-        return standardise(y_ref)
-    return y_ref
+        return standardise(X)
+    return X

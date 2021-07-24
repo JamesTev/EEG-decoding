@@ -1,7 +1,7 @@
 from ulab import numpy as np
 import urandom
 
-def solve_gen_eig_prob(A, B, eps=1e-8):
+def solve_gen_eig_prob(A, B, eps=1e-6):
     """
     Solves the generalised eigenvalue problem of the form:
     Aw = \lambda*Bw
@@ -28,22 +28,35 @@ def solve_gen_eig_prob(A, B, eps=1e-8):
     
     return np.diag(Lam), Phi
 
-def solve_eig_qr(A, n_eig, lam_iterations=5):
+def solve_eig_qr(A, iterations=30):
+
     Ak = A
-    n_eig = min(n_eig, min(A.shape()))
+    Q_bar = np.eye(len(Ak))
 
-    for k in range(lam_iterations):
+    for _ in range(iterations):
         Qk, Rk = np.linalg.qr(Ak)
-        Ak = np.dot(Rk, Qk.transpose())
+        Ak = np.dot(Rk, Qk)
+        Q_bar = np.dot(Q_bar, Qk)
 
-    lam = np.diag(Ak) # get eigenvalues
-    V = []
-    for l in lam[:n_eig]: # now find `n_eig` eigenvectors
-        A_null = (A - np.eye(A.shape()[0])*l).transpose()
-        Q, R = np.linalg.qr(A_null) # compute null space of (A-lam*I) to get eigenvector
-        Q = Q.transpose()
-        V.append(Q[:, -1])
-    return lam, np.array(V).transpose()
+    lam = np.diag(Ak)
+    return lam, Q_bar
+
+# def solve_eig_qr(A, n_eig, lam_iterations=5):
+#     # !! note: eigenvectors can only be found reliably if A is symmetric
+#     Ak = A
+#     n_eig = min(n_eig, min(A.shape()))
+
+#     for k in range(lam_iterations):
+#         Qk, Rk = np.linalg.qr(Ak)
+#         Ak = np.dot(Rk, Qk)
+
+#     lam = np.diag(Ak) # get eigenvalues
+#     V = []
+#     for l in lam[:n_eig]: # now find `n_eig` eigenvectors
+#         A_null = (A - np.eye(A.shape()[0])*l).transpose()
+#         Q, R = np.linalg.qr(A_null) # compute null space of (A-lam*I) to get eigenvector
+#         V.append(Q[:, -1])
+#     return lam, np.array(V).transpose()
 
 def power_iteration(A, iterations):
     """
@@ -64,7 +77,7 @@ def power_iteration(A, iterations):
 
     return b_k1_norm, b_k
 
-def max_eig(A, power_iterations=50):
+def max_eig(A, iterations, numeric_method='qr'):
     """
     Function to return the largest eigenvalue of a matrix and its corresponding eigenvector.
     
@@ -76,8 +89,15 @@ def max_eig(A, power_iterations=50):
         lam, V = np.linalg.eig(A)
         v = V[:, np.argmax(lam)]
     except ValueError:
-        lam, v = power_iteration(A, power_iterations)
-        
+        if numeric_method == 'power_iteration':
+            lam, v = power_iteration(A, iterations)
+        else:
+            if numeric_method != 'qr':
+                print("Unknown `numeric_method` arg: defaulting to QR solver")
+            lam, v = solve_eig_qr(A, 1, lam_iterations=iterations)
+            lam = lam[0] # only need first eigen val (largest returned first)
+            v = v[:, 0] # only first eig vector 
+            
     return lam, v
         
 def resample(X, factor):

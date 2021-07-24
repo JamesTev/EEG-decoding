@@ -1,34 +1,37 @@
 import utime
 from machine import Pin
+import gc
 
-led = Pin(5, Pin.OUT)
+led = Pin(26, Pin.OUT)
+led_red = Pin(13, Pin.OUT)
+btn = Pin(32, Pin.IN, Pin.PULL_UP)
 
-for i in range(10):
-    led.value(not led.value())
-    utime.sleep(0.1)
+def flash(iterations, duration):
+    for i in range(iterations):
+        led.value(not led.value())
+        utime.sleep(duration)
+        
+flash(5, 0.1)
 
-led.on() # logic inverted for built in led
+t0 = utime.time()
+run_main = False
 
-def connect_wifi():
-    import network
+led_red.value(0)
+led.value(1)
 
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    t = utime.time()
-    if not wlan.isconnected():
-        print('connecting to network...')
-        wlan.connect('Teversham 2.4GHz', '083655655000')
-        while not wlan.isconnected():
-            print('.')
-            utime.sleep(0.25)
-            
-            if (utime.time()-t)>5:
-                print('Network attempt timed out. ')
-                break
-            pass
-    
-    if wlan.isconnected():
-        print('network config:', wlan.ifconfig())
+while utime.time()-t0 < 2.5 or run_main:
+    if btn.value()==0:
+        # run the main process
+        led_red.value(1)
+        run_main = True
+        from lib.core import initialise, run
+        gc.collect()
+        initialise()
+        gc.collect()
+        run()
+        
+# exit and continue to normal dev mode
+flash(2, 0.2)
+led.value(0)
 
-# connect_wifi()
 

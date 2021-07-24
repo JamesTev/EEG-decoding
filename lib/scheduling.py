@@ -2,6 +2,7 @@ from machine import Pin, Timer
 import micropython
 import ujson as json
 from lib.signal import dummy_calc
+import utime as time
 
 micropython.alloc_emergency_exception_buf(100)
 
@@ -10,14 +11,16 @@ class ScheduledFunc():
         self.freq = freq
         self.tim = Timer(timer_num)
         
-    def start(self):
+    def start(self, callback=None):
+        callback = callback or self.cb # use callback if supplied, else default class callback
         period = int(1000/self.freq)
-        self.tim.init(period=period, callback=self.cb) # 100 ms period
+        self.tim.init(period=period, callback=callback) # 100 ms period
         
-    def run_for_duration(self, t):
-        import utime
+    def run_for_duration(self, duration_sec):
         self.start()
-        utime.sleep(t)
+        t0 = time.time()
+        while time.time() - t0 < duration_sec:
+            pass
         self.stop()
     
     def stop(self):

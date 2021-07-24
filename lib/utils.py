@@ -4,8 +4,14 @@ def delay_ms(t):
     t0 = utime.time()
     while (utime.time()-t0)*1000 < t:
         pass # TODO: investigate if this will actually free core during delay
+    
+def update_buffer(buf, el, max_size):
+    if type(el) in [float, int]:
+        el = [el]
+    el = el[-max_size:]
+    return (buf[-(max_size-len(el)):]+el)[-max_size:]
 
-def connect_wifi():
+def connect_wifi(ssid, password):
     import network
     import binascii
 
@@ -13,8 +19,8 @@ def connect_wifi():
     wlan.active(True)
     if not wlan.isconnected():
         print('connecting to network...')
-        wlan.connect('Harry Wifi', '5BjkgMCp1nJK')
-        while not wlan.isconnected():
+        wlan.connect(ssid, password)
+        while not wlan.isconnected(): # okay that this is blocking
             pass
     print('network config:', wlan.ifconfig())
     return wlan
@@ -28,6 +34,6 @@ def load_env_vars(path):
         for line in ins:
             match = envre.match(line)
             if match is not None:
-                result[match.group(1)] = match.group(2).replace('\n', '').replace(' ', '')
+                result[match.group(1)] = match.group(2).replace('\n', '')
     return result
 

@@ -10,7 +10,79 @@ from .utils import resample, standardise, solve_gen_eig_prob
 
 np.random.seed(0)
 
+
 class GCCA():
+    """
+    Generalised canonical component analysis.
+    
+    Ref: 'Improving SSVEP Identification Accuracy via Generalized Canonical Correlation Analysis'
+    Sun, Chen et al
+    """
+    
+    def __init__(self, f_ssvep, fs, Nh=3, w=None, name=None):
+        self.Nc, self.Ns, self.Nt = None, None, None
+        self.Nh = Nh
+        self.w_chi_bar_n = None
+        self.w_Y_n = None
+        self.w_Chi_n = None
+        self.fs = fs
+        self.f_ssvep = f_ssvep
+        
+        self.name = name or "gcca_{0}hz".format(f_ssvep)
+            
+        
+    def fit(self, X):
+        """
+        Fit against training tensor X.
+        
+        X should be a 4th order tensor of dim (Nf x Nc x Ns x Nt)
+        """
+        assert len(X.shape) == 3, "Expected 4th order input data tensor: Nc x Ns x Nt"
+        self.Nc, self.Ns, self.Nt = X.shape
+        
+        Chi_n = X
+        Chi_n_c = Chi_n.reshape((self.Nc, self.Ns*self.Nt))
+
+        Chi_bar_n = np.mean(Chi_n, axis=-1) # mean over trials for each channel with all samples: output shape is Nc x Ns x 1
+        Chi_bar_n_c = np.concatenate([Chi_bar_n for i in range(self.Nt)], axis=1) # concat along columns
+
+        Y_n = cca_reference([self.f_ssvep], self.fs, self.Ns, Nh=self.Nh).reshape(-1, self.Ns)
+        Y_n_c = np.concatenate([Y_n for i in range(self.Nt)], axis=1)
+
+        # form X and D and find eigenvals
+        X = np.c_[Chi_n_c.T, Chi_bar_n_c.T, Y_n_c.T].T
+
+        d1 = Chi_n_c.dot(Chi_n_c.T)
+        d2 = Chi_bar_n_c.dot(Chi_bar_n_c.T)
+        d3 = Y_n_c.dot(Y_n_c.T)
+        D = block_diag(d1, d2, d3)
+
+        lam, W_eig = solve_gen_eig_prob(X.dot(X.T), D) # solve generalised eigenvalue problem
+
+        i = np.argmax(np.real(lam))
+        w = W_eig[:, i] # optimal spatial filter vector with dim (2*Nc + 2*Nh)
+        
+        w_Chi_n = w[:self.Nc] # first Nc weight values correspond to data channels
+        w_Chi_bar_n = w[self.Nc:2*self.Nc] # second Nc weights correspond to Nc template channels
+        w_Y_n = w[2*self.Nc:] # final 2*Nh weights correspond to ref sinusoids with harmonics
+        
+        self.w_chi_bar_n =  w_Chi_bar_n.T.dot(Chi_bar_n)
+        self.w_Y_n = w_Y_n.T.dot(Y_n)
+        self.w_Chi_n = w_Chi_n
+        
+            
+    def classify(self, X_test):
+        if self.w_chi_bar_n is None:
+            raise ValueError("call `.fit(X_train)` before performing classification.")
+
+        rho1 = pearsonr(self.w_Chi_n.T.dot(X_test), self.w_chi_bar_n)[0]
+        rho2 = pearsonr(self.w_Chi_n.T.dot(X_test), self.w_Y_n)[0]
+
+        rho = np.sum([np.sign(rho_i)*rho_i**2 for rho_i in [rho1, rho2]])
+        
+        return rho
+
+class GCCA_SSVEP():
     """
     Generalised canonical component analysis.
     
