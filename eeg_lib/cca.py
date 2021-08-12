@@ -1,4 +1,3 @@
-
 from sklearn.cross_decomposition import CCA as CCA_sklearn
 from .filtering import filterbank
 import numpy as np
@@ -35,7 +34,7 @@ class GCCA():
         """
         Fit against training tensor X.
         
-        X should be a 4th order tensor of dim (Nf x Nc x Ns x Nt)
+        X should be a 3rd order tensor of dim (Nc x Ns x Nt)
         """
         assert len(X.shape) == 3, "Expected 4th order input data tensor: Nc x Ns x Nt"
         self.Nc, self.Ns, self.Nt = X.shape
@@ -174,7 +173,7 @@ class MsetCCA():
         """
         Fit against training tensor chi.
         
-        chi should be a 4th order tensor of dim (Nc x Ns x Nt)
+        chi should be a 3rd order tensor of dim (Nc x Ns x Nt)
         """
         assert len(chi.shape) == 3, "Expected 3rd order input data tensor for freq. fm: Nc x Ns x Nt"
         

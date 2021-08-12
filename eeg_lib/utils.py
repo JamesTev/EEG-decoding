@@ -1,6 +1,6 @@
 import numpy as np
 import glob
-import scipy
+import json
 
 from numpy import linalg as LA
 
@@ -91,3 +91,11 @@ def load_trials(path_pattern, verbose=False):
             min_len = len(f['data'])
     
     return np.array([trial[:min_len-1] for trial in data])
+
+def write_json(filename, data):
+    with open(filename, 'w') as f:
+            json.dump(data, f)
+
+def read_json(filename):
+    with open(filename) as f:
+        return json.load(f)

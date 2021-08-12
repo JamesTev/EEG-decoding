@@ -15,21 +15,21 @@ class CCA():
         result = {}
         Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
         for f in self.stim_freqs:
-            Y = harmonic_reference(f, self.fs, np.max(X_test.shape()), Nh=self.Nh, standardise_out=False)
+            Y = harmonic_reference(f, self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False)
             rho = self.cca_eig(X_test, Y, Cxx=Cxx) # canonical variable matrices. Xc = X^T.W_x
             result[f] = rho
         return result
     
     @staticmethod
-    def cca_eig(X, Y, Cxx=None):
+    def cca_eig(X, Y, Cxx=None, eps=1e-6):
         if Cxx is None:
             Cxx = np.dot(X, X.transpose()) # auto correlation matrix
         Cyy = np.dot(Y, Y.transpose()) 
         Cxy = np.dot(X, Y.transpose()) # cross correlation matrix
         Cyx = np.dot(Y, X.transpose()) # same as Cxy.T
 
-        M1 = np.dot(np.linalg.inv(Cxx), Cxy) # intermediate result
-        M2 = np.dot(np.linalg.inv(Cyy), Cyx)
+        M1 = np.dot(np.linalg.inv(Cxx+eps), Cxy) # intermediate result
+        M2 = np.dot(np.linalg.inv(Cyy+eps), Cyx)
 
         lam, _ = solve_eig_qr(np.dot(M1, M2), 20)
         return np.sqrt(lam)

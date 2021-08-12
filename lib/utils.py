@@ -37,3 +37,12 @@ def load_env_vars(path):
                 result[match.group(1)] = match.group(2).replace('\n', '')
     return result
 
+def write_json(filename, data):
+    import ujson as json
+    with open(filename, 'w') as f:
+            json.dump(data, f)
+
+def read_json(filename):
+    import ujson as json
+    with open(filename) as f:
+        return json.load(f)

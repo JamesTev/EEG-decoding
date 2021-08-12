@@ -1,7 +1,6 @@
 from machine import Pin, Timer
 import micropython
 import ujson as json
-from lib.signal import dummy_calc
 import utime as time
 
 micropython.alloc_emergency_exception_buf(100)
@@ -13,8 +12,7 @@ class ScheduledFunc():
         
     def start(self, callback=None):
         callback = callback or self.cb # use callback if supplied, else default class callback
-        period = int(1000/self.freq)
-        self.tim.init(period=period, callback=callback) # 100 ms period
+        self.tim.init(freq=self.freq, callback=callback) # !! freq kwarg was only added in mpy v1.16
         
     def run_for_duration(self, duration_sec):
         self.start()
@@ -54,7 +52,7 @@ class WsDataScheduler(ScheduledFunc):
         
     def send_data(self, *args):
         self.ws_server.process_all()
-        data = dummy_calc() #.flatten()
+        data = None
         self.ws_server.broadcast(json.dumps(data))
 #         self.ws_server.broadcast(data.tobytes())
     

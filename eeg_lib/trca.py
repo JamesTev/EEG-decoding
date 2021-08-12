@@ -34,6 +34,8 @@ class TRCA():
         Q = np.dot(X_bar, X_bar.T) # Nc x Nc data covariance matrix
         lam, W = np.linalg.eig(np.dot(np.linalg.inv(Q), S))
         
+        print(lam, W)
+        
         i = np.argsort(np.real(lam))[::-1] # get order of largest eigenvalues in lam
         
         self.X = X
