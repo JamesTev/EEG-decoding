@@ -196,7 +196,7 @@ class MsetCCA():
         if self.Y is None:
             raise ValueError("Reference matrix Y must be computed using `fit` before computing corr")
         if method == 'eig':
-            rho = CCA.cca_eig(X_test.T, self.Y.T)[0]
+            rho = CCA.cca_eig(X_test, self.Y)[0]
         else: # use sklearn implementation
             cca = CCA_sklearn(n_components=1)
             Xc, Yc = cca.fit_transform(X_test.T, self.Y.T)
@@ -211,7 +211,7 @@ class MsetCCA_SSVEP():
 
     def fit(self, X_ssvep):
         '''
-        Fit the independent Nf TRCA models using input data tensor `X_ssvep`
+        Fit the independent Nf MsetCCA models using input data tensor `X_ssvep`
         
         :param 
         X_ssvep: 4th order data tensor (Nf x Nc x Ns x Nt)
@@ -232,52 +232,33 @@ class MsetCCA_SSVEP():
     
 class CCA():
     
-    def __init__(self, stim_freqs, fs, Nh=3):
+    def __init__(self, stim_freqs, fs, Nh=2):
         self.Nh = Nh
         self.stim_freqs = stim_freqs
         self.fs = fs
-        self.cca_models =  {f:CCA_sklearn(n_components=1) for f in stim_freqs}
-        self.is_fit = False
         
-    def fit(self, X, resampling_factor=None):
-        for f in self.stim_freqs:
-            Y = cca_reference([f], self.fs, len(X), Nh=self.Nh, standardise_out=True)
-
-            if resampling_factor is not None:
-                X = resample(X, resampling_factor)
-
-            self.cca_models[f].fit(X, Y)
-            
-        self.is_fit = True
-        
-    def classify(self, X_test, method='eig'):
-        if not self.is_fit and method != 'eig':
-            self.fit(X_test)
-            
+    def compute_corr(self, X_test):            
         result = {}
+        Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
         for f in self.stim_freqs:
-            Y = cca_reference([f], self.fs, len(X_test), Nh=self.Nh, standardise_out=True)
-            if method == 'eig':
-                rho = self.cca_eig(X_test, Y)[0]
-            else:
-                Xc, Yc = self.cca_models[f].transform(X_test, Y) # canonical variable matrices. Xc = X^T.W_x
-                rho = pearsonr(Xc[:, 0], Yc[:, 0])[0]
+            Y = cca_reference(f, self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False)
+            rho = self.cca_eig(X_test, Y, Cxx=Cxx) # canonical variable matrices. Xc = X^T.W_x
             result[f] = rho
         return result
     
     @staticmethod
-    def cca_eig(X, Y, n_components=1):
-        Cxx = X.T.dot(X) # auto correlation matrix
-        Cyy = Y.T.dot(Y) 
-        Cxy = X.T.dot(Y) # cross correlation matrix
-        Cyx = Y.T.dot(X) # same as Cxy.T
+    def cca_eig(X, Y, Cxx=None, eps=1e-6):
+        if Cxx is None:
+            Cxx = np.dot(X, X.transpose()) # auto correlation matrix
+        Cyy = np.dot(Y, Y.transpose()) 
+        Cxy = np.dot(X, Y.transpose()) # cross correlation matrix
+        Cyx = np.dot(Y, X.transpose()) # same as Cxy.T
 
-        M1 = np.linalg.inv(Cxx).dot(Cxy) # intermediate result
-        M2 = np.linalg.inv(Cyy).dot(Cyx)
+        M1 = np.dot(np.linalg.inv(Cxx+eps), Cxy) # intermediate result
+        M2 = np.dot(np.linalg.inv(Cyy+eps), Cyx)
 
-        M = M1.dot(M2)
-        lam = np.linalg.eigvals(M)
-        return sorted(np.sqrt(lam), reverse=True)[:n_components] # return largest n sqrt eig vals
+        lam, _ = solve_eig_qr(np.dot(M1, M2), 20)
+        return np.sqrt(lam)
 
 def fbcca(eeg, list_freqs, fs, num_harms=3, num_fbs=5):
     
@@ -397,3 +378,23 @@ def fbcca_realtime(data, list_freqs, fs, num_harms=3, num_fbs=5):
         return 999 #if the correlation isn't big enough, do not return any command
     else:
         return result
+    
+def standardise(X):
+    axis = np.argmax(X.shape())
+    minor_shape = np.min(X.shape())
+    mu = np.mean(X, axis=axis).reshape((minor_shape, 1))
+    sigma = np.std(X, axis=axis).reshape((minor_shape, 1))
+    return (X-mu)/sigma
+
+def solve_eig_qr(A, iterations=30):
+
+    Ak = A
+    Q_bar = np.eye(len(Ak))
+
+    for _ in range(iterations):
+        Qk, Rk = np.linalg.qr(Ak)
+        Ak = np.dot(Rk, Qk)
+        Q_bar = np.dot(Q_bar, Qk)
+
+    lam = np.diag(Ak)
+    return lam, Q_bar
