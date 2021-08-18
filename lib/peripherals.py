@@ -1,15 +1,16 @@
 import machine
-from machine import Pin
 from lib.scheduling import LedFlasher
 from lib.utils import update_buffer
 
 import utime as time
+import gc
     
 DEFAULT_SPI_PARAMS = {
     'spi_num': 2,
     'sck': 18,
     'mosi': 23,
-    'miso': 19
+    'miso': 19,
+    'output_amp_gain': 100 # value between 0-255 controlling gain of output amplifier
 }
 
 DEFAULT_ADC_PARAMS = {
@@ -28,16 +29,25 @@ DEFAULT_BTN_CONFIG = {
     'btn_a': 32,
     'btn_b': 34
 }
+
+del machine # only needed for above imports
+gc.collect
     
 class PeripheralManager:
     
-    def __init__(self, adc_params:dict=None, spi_params:dict=None, verbose=True):
-        self.verbose = verbose
-        self._adc_params = self._verify_params(adc_params, 'adc')
-        self._spi_params = self._verify_params(spi_params, 'spi')
+    def __init__(self, adc_params:dict={}, spi_params:dict={}, led_config:dict={}, btn_config:dict={}, verbose=True):
+        from machine import Pin
         
-        self._led_config = DEFAULT_LED_CONFIG # leave as unconfigurable for now
+        self.verbose = verbose
+        self._adc_params = DEFAULT_ADC_PARAMS
+        self._spi_params = DEFAULT_SPI_PARAMS
+        self._led_config = DEFAULT_LED_CONFIG
         self._btn_config = DEFAULT_BTN_CONFIG
+        
+        self._adc_params.update(adc_params)
+        self._spi_params.update(spi_params)
+        self._led_config.update(led_config)
+        self._btn_config.update(btn_config)
         
         # init LEDs
         self.leds = {}
@@ -52,10 +62,13 @@ class PeripheralManager:
         self._adc_buffer = []
         self._timing_buffer = []
         self._adc_scheduler = None
+        
+        gc.collect()
     
     def init(self):
-        # machine.Pin(13, machine.Pin.IN)   #set GPIO 13 as high impedance pin
-        self._adc = machine.ADC(Pin(self._adc_params["adc_pin"])) #create ADC object on GPIO 33
+        from machine import Pin, SPI, ADC 
+        
+        self._adc = ADC(Pin(self._adc_params["adc_pin"])) #create ADC object on GPIO 33
         self._adc.atten(self._adc_params["atten"])
         self._adc.width(self._adc_params["width"])
         if self.verbose: 
@@ -70,17 +83,20 @@ class PeripheralManager:
         #set up button pin = GPIO 21
         get_param = lambda key: Pin(self._spi_params[key])
         temp_spi_params = {key:get_param(key) for key in ['sck', 'miso', 'mosi']}
-        self._spi = machine.SPI(self._spi_params["spi_num"], baudrate=10000000, polarity=0, phase=0, **temp_spi_params)
+        self._spi = SPI(self._spi_params["spi_num"], baudrate=10000000, polarity=0, phase=0, **temp_spi_params)
         if self.verbose:
             print('SPI initialised')
             
-        self.spi_write(0)
+        output_gain = max(min(self._spi_params['output_amp_gain'], 255), 0)
+        self.spi_write(output_gain)
         if self.verbose:
-            print('DigiPot set to minimum gain (1.8)')  
+            print('DigiPot set to {0} = gain of {1}'.format(output_gain, 1.745+(255-output_gain)/(19.2-1.745))) 
+            
+        gc.collect() 
             
     @property
     def adc_running(self):
-        return not self._adc_scheduler is None
+        return not self._adc_scheduler is None # best proxy we have: no native micropython method
             
     def flash_led(self, label, freq, duration_sec):
         led = self.get_led(label)
@@ -125,17 +141,16 @@ class PeripheralManager:
         data = bytearray([17, payload])
         self._spi.write(data)
         
-    def adc_read_to_buff(self, size=-1):
+    def adc_read_to_buff(self, size=-1, record_timing=False):
         """Read adc and write to internal buffer.
 
         Args:
             size (int, optional): number samples to take. If -1, buffer will be filled. Defaults to -1.
         """
-        delta = time.ticks_us()
-        # if len(self._timing_buffer) > 0:
-        #     delta = time.ticks_diff(delta, self._timing_buffer[-1])
+        if record_timing:
+            delta = time.ticks_us()
 
-        self._timing_buffer = update_buffer(self._timing_buffer, delta, 20)
+            self._timing_buffer = update_buffer(self._timing_buffer, delta, 20)
         
         buff_size = self._adc_params["buffer_size"]
         if size < 0 or size > buff_size:
@@ -146,13 +161,3 @@ class PeripheralManager:
         
     def adc_read(self, size=1):
         return [self._adc.read() for i in range(size)] 
-            
-    def _verify_params(self, given_params, param_type):
-        
-        ref_params = DEFAULT_ADC_PARAMS if param_type == 'adc' else DEFAULT_SPI_PARAMS
-        if given_params is None:
-            return ref_params
-        else:
-            if not set(ref_params.keys()).issubset(set(given_params.keys())):
-                raise ValueError("Expected the following params to be supplied for {0} params: {1}".format(param_type, set(ref_params.keys())))
-            return given_params 
