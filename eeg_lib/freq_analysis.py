@@ -99,6 +99,9 @@ def plot_periodogram(x, fs, ssvep_f0=None, N=2048, figsize=(14,10), axes=None):
     for ax in (ax0, ax1):
         ax.set_xlabel('frequency (Hz)')
         ax.set_ylabel('PSD (dB)')
+        
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
       
         x_max = 60
         ax.set_xlim(0, x_max)

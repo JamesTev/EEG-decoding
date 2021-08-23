@@ -225,11 +225,7 @@ class MsetCCA_SSVEP():
     def classify(self, X_test, method='cca'):
         assert len(X_test.shape) == 2, "Expected a matrix with shape (Nc x Ns)"
         
-        return {f: self.models[f].compute_corr(X_test, method=method) for f in self.stim_freqs}
-    
-    def get_eig(self):
-        return {f: self.models[f].get_eig() for f in self.stim_freqs}
-    
+        return {f: self.models[f].compute_corr(X_test, method=method) for f in self.stim_freqs}    
 class CCA():
     
     def __init__(self, stim_freqs, fs, Nh=2):
@@ -241,7 +237,7 @@ class CCA():
         result = {}
         Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
         for f in self.stim_freqs:
-            Y = cca_reference(f, self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False)
+            Y = cca_reference([f], self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False)
             rho = self.cca_eig(X_test, Y, Cxx=Cxx) # canonical variable matrices. Xc = X^T.W_x
             result[f] = rho
         return result
