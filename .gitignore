@@ -129,3 +129,4 @@ dmypy.json
 /plots
 /data
 micropython/mpy-modules/*.mpy
+.DS_store
