@@ -10,7 +10,7 @@ def rand_str(l=10):
 def default_sub_cb(topic, msg):
     print(topic, msg)
     
-env_vars = load_env_vars(".env")
+env_vars = load_env_vars("lib/.env")
     
 def setup_mqtt_client(client_id=None, callback=None):
     

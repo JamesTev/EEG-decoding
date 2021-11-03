@@ -13,7 +13,6 @@ def update_buffer(buf, el, max_size):
 
 def connect_wifi(ssid, password):
     import network
-    import binascii
 
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)

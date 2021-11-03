@@ -57,7 +57,7 @@ def initialise(offline=False, spi_params=None, adc_params=None):
         mqtt_client = setup_mqtt_client()
         topic = get_default_topic()
 
-        env_vars = load_env_vars(".env")
+        env_vars = load_env_vars("lib/.env")
         # connect WiFI
         ssid = env_vars.get("WIFI_SSID")
         password = env_vars.get("WIFI_PASSWORD")

@@ -50,9 +50,41 @@ Then, follow the deployment steps as mentioned above to flash the new image onto
 
 Install the [`ampy`](https://learn.adafruit.com/micropython-basics-load-files-and-run-code/install-ampy) Python package in your same virtual environment. This allows you to upload, read, manipulate and delete files in non-volatile storage (flash) on the ESP32 over serial. 
 
-Test the installation with `ampy -p /dev/tty.usbserial-02U1W54L ls` to list the files in NVS on the board (remember to replace your port accordingly). You should see something like `/boot.py`. You can see a list of other useful commands by typing `ampy --help`.  
+Test the installation with `ampy -p /dev/tty.usbserial-02U1W54L ls` to list the files in NVS on the board (remember to replace your port accordingly). You should see something like `/boot.py`. You can see a list of other useful commands by typing `ampy --help`.
 
+As the MicroPython modules in this project *are not built into the firmware image by default*, you can use `ampy` to send them to your target board. Run 
+```bash
+ampy -p /dev/tty.usbserial-02U1W54L put lib/
+```
+from within this directory to copy the `lib` package to the target (remember to __update your port__ accordingly). This will take a good few seconds to complete. Once done, you can access any of the `lib` modules as you would standard Python modules. For example, you can test an import from the `decoding` module as follows:
+```python
+from lib.decoding import CCA
+```
+Note: you can also cross compile all modules in `lib` using `mpy-cross` or the `cross-compile.sh` script provided. If you send the compiled `.mpy` versions to the target board, you can still import and use them in exactly the same way (there is no difference from a usage point of view).
 ### Development
+#### Initial setup
+Some of the core functionality in the provided `lib` requires a few key variables to be set in a `.env` file that gets loaded in. You'll need to create a `.env` file in the `lib/` directory and provide the following:
+```bash
+WIFI_SSID=your-wifi-ssid
+WIFI_PASSWORD=your-wifi-password
+
+# optional: MQTT server information
+MQTT_SERVER=mqtt-server-address
+MQTT_PORT=000
+MQTT_DEFUALT_TOPIC=mqtt-default-topic
+```
+You'll then need to actually upload the `.env` file to the target. You can either run the following from within a Jupyter Notebook (described below),
+```ipython
+%sendtofile lib/.env --source lib/.env
+```
+or you can use `ampy`:
+```bash
+ampy -p /dev/tty.usbserial-02U1W54L put .env lib/.env
+```
+Note that the first file argument is the source path and the second is the destination path (where on your target board the file will be uploaded to).
+
+#### Jupyter over serial
+
 An extremely useful feature of the MicroPython development platform is that it is compatible with Jupyter notebooks over serial. This has been made possible by projects like [this one](https://github.com/goatchurchprime/jupyter_micropython_kernel/) which contains all the details in getting setup. 
 
 In summary, from within your virtual env, run:
@@ -111,7 +143,7 @@ A_pinv = np.dot(np.linalg.inv(np.dot(np.transpose(A), A)), np.transpose(A))
 
 # many other utility functions such as argmax(), argsort(), convolve()
 ```
-
+**Tip:** as with ordinary Jupyter Notebooks, you can use magic commands. Run `%lsmagic` in any cell to get a list of the magic commands available. These include commands to reset your device, send/retrieve files and others.
 
 ### Troubleshooting
 If you see complaints about not finding `idf.py`, it may be that the ESP-IDF has not been exported properly. To rectify this, navigate to `$BUILD_DIR/micropython/esp-idf`. Make sure the correct python environment has been activated and then run 
