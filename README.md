@@ -1,6 +1,6 @@
 
 # World Wide Mind
-Real-time EEG decoding across 100 brains
+Real-time EEG decoding across 100 brains. A poster presentation for this project can be found [here](https://jamestev.github.io/msc-dissertation-poster.pdf) and the full report [here](https://jamestev.github.io/msc-dissertation.pdf).
 
 ## Setup 
 See [MicroPython setup](/micropython/README.md) for installing, building and flashing a port of MicroPython for the Espressif ESP32 used in this project. Instructions are also provided for development and experimentation.
