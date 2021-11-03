@@ -1,3 +1,9 @@
+
+# World Wide Mind
+Real-time EEG decoding across 100 brains
+
+## Setup 
+See [MicroPython setup](/micropython/README.md) for installing, building and flashing a port of MicroPython for the Espressif ESP32 used in this project. Instructions are also provided for development and experimentation.
 ## Background
 
 This project formed part of an MSc dissertation in collaboration with the [Next Generation Neural Interfaces (NGNI) Lab](https://www.imperial.ac.uk/next-generation-neural-interfaces) at Imperial College London. It was intended to explore the possibility of simultaneous decoding and visualisation of EEG signals acquired from ~100 different audience members simultaneously during a large scale exhibition. Signals acquired from the BCI devices are used for collaborative control in a multiplayer game (using only mental control). 
