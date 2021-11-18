@@ -1,6 +1,7 @@
 from websocket.ws_connection import ClientClosedError
 from websocket.ws_server import WebSocketServer, WebSocketClient
 
+
 class BasicClient(WebSocketClient):
     def __init__(self, conn):
         super().__init__(conn)
@@ -23,11 +24,12 @@ class BasicServer(WebSocketServer):
 
     def _make_client(self, conn):
         return BasicClient(conn)
-    
+
     def broadcast(self, msg):
         for client in self._clients:
             client.connection.write(msg)
-            
+
+
 def test():
     server = BasicServer()
     server.start()

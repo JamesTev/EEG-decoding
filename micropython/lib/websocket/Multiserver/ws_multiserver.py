@@ -11,7 +11,7 @@ class WebSocketMultiServer(WebSocketServer):
         200: "OK",
         404: "Not Found",
         500: "Internal Server Error",
-        503: "Service Unavailable"
+        503: "Service Unavailable",
     }
 
     mime_types = {
@@ -22,7 +22,7 @@ class WebSocketMultiServer(WebSocketServer):
         "html": "text/html",
         "htm": "text/html",
         "css": "text/css",
-        "js": "application/javascript"
+        "js": "application/javascript",
     }
 
     def __init__(self, index_page, max_connections=1):
@@ -42,15 +42,25 @@ class WebSocketMultiServer(WebSocketServer):
 
         requested_file = None
         data = cl.recv(64).decode()
-        if data and "Upgrade: websocket" not in data.split("\r\n") and "GET" == data.split(" ")[0]:
+        if (
+            data
+            and "Upgrade: websocket" not in data.split("\r\n")
+            and "GET" == data.split(" ")[0]
+        ):
             # data should looks like GET /index.html HTTP/1.1\r\nHost: 19"
             # requested file is on second position in data, ignore all get parameters after question mark
             requested_file = data.split(" ")[1].split("?")[0]
-            requested_file = self._page if requested_file in [None, "/"] else requested_file
+            requested_file = (
+                self._page if requested_file in [None, "/"] else requested_file
+            )
 
         try:
             websocket_helper.server_handshake(cl)
-            self._clients.append(self._make_client(WebSocketConnection(remote_addr, cl, self.remove_connection)))
+            self._clients.append(
+                self._make_client(
+                    WebSocketConnection(remote_addr, cl, self.remove_connection)
+                )
+            )
         except OSError:
             if requested_file:
                 cl.setblocking(True)
@@ -97,12 +107,15 @@ class WebSocketMultiServer(WebSocketServer):
                 content_type = WebSocketMultiServer.mime_types[ext]
 
         # Close connection after completing the request
-        return "HTTP/1.1 {} {}\n" \
-               "Content-Type: {}\n" \
-               "Content-Length: {}\n" \
-               "Server: ESPServer\n" \
-               "Connection: close\n\n".format(
-                code, WebSocketMultiServer.http_codes[code], content_type, length)
+        return (
+            "HTTP/1.1 {} {}\n"
+            "Content-Type: {}\n"
+            "Content-Length: {}\n"
+            "Server: ESPServer\n"
+            "Connection: close\n\n".format(
+                code, WebSocketMultiServer.http_codes[code], content_type, length
+            )
+        )
 
     @staticmethod
     def _generate_static_page(sock, code, message):

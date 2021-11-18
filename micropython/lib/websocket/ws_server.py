@@ -25,7 +25,7 @@ class WebSocketServer:
 
     def _setup_conn(self, port, attempt_wifi_conn=True):
         from lib.utils import connect_wifi
-        
+
         self._listen_s = socket.socket()
         self._listen_s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._listen_poll = uselect.poll()
@@ -36,9 +36,9 @@ class WebSocketServer:
         self._listen_s.bind(addr)
         self._listen_s.listen(1)
         self._listen_poll.register(self._listen_s)
-        
+
         connect_wifi()
-        
+
         for i in (network.AP_IF, network.STA_IF):
             iface = network.WLAN(i)
             if iface.active():
@@ -62,7 +62,7 @@ class WebSocketServer:
             cl.setblocking(True)
             cl.sendall("HTTP/1.1 503 Too many connections\n\n")
             cl.sendall("\n")
-            #TODO: Make sure the data is sent before closing
+            # TODO: Make sure the data is sent before closing
             sleep(0.1)
             cl.close()
             return
@@ -74,18 +74,24 @@ class WebSocketServer:
             self._serve_page(cl)
             return
 
-        self._clients.append(self._make_client(WebSocketConnection(remote_addr, cl, self.remove_connection)))
+        self._clients.append(
+            self._make_client(
+                WebSocketConnection(remote_addr, cl, self.remove_connection)
+            )
+        )
 
     def _make_client(self, conn):
         return WebSocketClient(conn)
 
     def _serve_page(self, sock):
         try:
-            sock.sendall('HTTP/1.1 200 OK\nConnection: close\nServer: WebSocket Server\nContent-Type: text/html\n')
+            sock.sendall(
+                "HTTP/1.1 200 OK\nConnection: close\nServer: WebSocket Server\nContent-Type: text/html\n"
+            )
             length = os.stat(self._page)[6]
-            sock.sendall('Content-Length: {}\n\n'.format(length))
+            sock.sendall("Content-Length: {}\n\n".format(length))
             # Process page by lines to avoid large strings
-            with open(self._page, 'r') as f:
+            with open(self._page, "r") as f:
                 for line in f:
                     sock.sendall(line)
         except OSError:
