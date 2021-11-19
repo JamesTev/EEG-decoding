@@ -1,4 +1,3 @@
-from micropython.lib.logging import BaseLogger
 from .peripherals import PeripheralManager
 from ulab import numpy as np
 from logging import BaseLogger, MQTTLogger, HTTPLogger, logger_types
