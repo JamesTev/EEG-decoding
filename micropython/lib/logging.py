@@ -15,7 +15,34 @@ class BaseLogger(ScheduledFunc):
         self.tim.init(freq=self.freq, callback=self.log)
 
 
-class MQTTLogger(BaseLogger):
+class WebLogger(BaseLogger):
+    def __init__(
+        self,
+        period_sec,
+        decoded_ref,
+        raw_data_ref,
+        timer_num=1,
+        server=None,
+        port=None,
+        send_raw=False,
+    ):
+        super().__init__(period_sec, decoded_ref, raw_data_ref, timer_num=timer_num)
+
+        if period_sec < 1:
+            print("Warning: async web logging at > 1Hz will be unreliable.")
+
+        self.send_raw = send_raw  # whether or not to send full raw data
+        self.server = server
+        self.port = port
+
+    def _prepare_payload(self, payload_id=None):
+        from lib.networking import pack_payload
+
+        raw_data = self.raw_data if self.send_raw else []
+
+        return pack_payload(raw_data, self.decoded_data, user_id=payload_id)
+
+class MQTTLogger(WebLogger):
     def __init__(
         self,
         period_sec,
@@ -28,14 +55,21 @@ class MQTTLogger(BaseLogger):
         qos=1,
         send_raw=False,
     ):
-        super().__init__(period_sec, decoded_ref, raw_data_ref, timer_num=timer_num)
+        super().__init__(
+            period_sec,
+            decoded_ref,
+            raw_data_ref,
+            timer_num=timer_num,
+            server=server,
+            port=port,
+            send_raw=send_raw,
+        )
 
         from lib.networking import setup_mqtt_client, get_default_topic
 
         self.client = setup_mqtt_client(server=server, port=port)
         self.topic = topic or get_default_topic()
         self.qos = qos
-        self.send_raw = send_raw  # whether or not to send full raw data
         self.establish_connection()
 
     def establish_connection(self):
@@ -46,21 +80,17 @@ class MQTTLogger(BaseLogger):
             topic=self.mqtt_topic, msg=json.dumps({"message": msg}), qos=self.qos
         )
 
-    def log(self, *args):
-        from lib.networking import pack_payload
-
-        raw_data = self.raw_data if self.send_raw else []
-
-        payload = pack_payload(
-            raw_data, self.decoded_data, client_id=self.client.client_id
-        )
-        self.client.publish(topic=self.topic, msg=payload, qos=self.qos)
+    def _prepare_payload(self):
+        return super()._prepare_payload(payload_id=self.client.client_id)
 
     def get_client(self):
         return self.client
 
+    def log(self, *args):
+        payload = self._prepare_payload()
+        self.client.publish(topic=self.topic, msg=payload, qos=self.qos)
 
-class HTTPLogger(BaseLogger):
+class HTTPLogger(WebLogger):
     def __init__(
         self,
         period_sec,
@@ -71,17 +101,18 @@ class HTTPLogger(BaseLogger):
         port=None,
         send_raw=False,
     ):
-        super().__init__(period_sec, decoded_ref, raw_data_ref, timer_num=timer_num)
-        self.send_raw = send_raw
-        self.server = server
-
-    def establish_connection(self):
-        msg = "ESP32 client {0} connected".format(self.client.client_id)
-
-        self.client.connect()
-        self.client.publish(
-            topic=self.mqtt_topic, msg=json.dumps({"message": msg}), qos=self.qos
+        super().__init__(
+            period_sec,
+            decoded_ref,
+            raw_data_ref,
+            timer_num=timer_num,
+            server=server,
+            port=port,
+            send_raw=send_raw,
         )
+    
+    def log(self, *args):
+        from lib.requests import MicroWebCli as requests
 
-    def get_client(self):
-        return self.client
+        payload = self._prepare_payload()
+        requests.POSTRequest(self.server, payload)
