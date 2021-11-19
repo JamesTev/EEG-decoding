@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, jsonify
 import json
 
 import time
@@ -40,9 +40,9 @@ def save_data():
     data = request.form.to_dict()
     if data is not None:
         log_data(data)
-        return Response("data stored successfully", status=200)
-    return Response("invalid data payload", status=400)
+        return jsonify(msg="data stored successfully"), 200
+    return jsonify(msg="invalid data payload"), 400
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5001)
