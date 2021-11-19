@@ -35,7 +35,7 @@ gc.collect
     
 class PeripheralManager:
     
-    def __init__(self, adc_params:dict={}, spi_params:dict={}, led_config:dict={}, btn_config:dict={}, verbose=True):
+    def __init__(self, adc_params=None, spi_params=None, led_config=None, btn_config=None, verbose=True):
         from machine import Pin
         
         self.verbose = verbose
@@ -44,10 +44,10 @@ class PeripheralManager:
         self._led_config = DEFAULT_LED_CONFIG
         self._btn_config = DEFAULT_BTN_CONFIG
         
-        self._adc_params.update(adc_params)
-        self._spi_params.update(spi_params)
-        self._led_config.update(led_config)
-        self._btn_config.update(btn_config)
+        self._adc_params.update(adc_params or {})
+        self._spi_params.update(spi_params or {})
+        self._led_config.update(led_config or {})
+        self._btn_config.update(btn_config or {})
         
         # init LEDs
         self.leds = {}
