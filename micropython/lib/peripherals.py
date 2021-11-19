@@ -4,13 +4,13 @@ from lib.utils import update_buffer
 
 import utime as time
 import gc
-    
+
 DEFAULT_SPI_PARAMS = {
-    'spi_num': 2,
-    'sck': 18,
-    'mosi': 23,
-    'miso': 19,
-    'output_amp_gain': 100 # value between 0-255 controlling gain of output amplifier
+    "spi_num": 2,
+    "sck": 18,
+    "mosi": 23,
+    "miso": 19,
+    "output_amp_gain": 100,  # value between 0-255 controlling gain of output amplifier
 }
 
 DEFAULT_ADC_PARAMS = {
@@ -25,30 +25,34 @@ DEFAULT_LED_CONFIG = {"green": 26, "red": 13}
 DEFAULT_BTN_CONFIG = {"btn_a": 32, "btn_b": 34}
 
 
-DEFAULT_BTN_CONFIG = {
-    'btn_a': 32,
-    'btn_b': 34
-}
+DEFAULT_BTN_CONFIG = {"btn_a": 32, "btn_b": 34}
 
-del machine # only needed for above imports
+del machine  # only needed for above imports
 gc.collect
-    
+
+
 class PeripheralManager:
-    
-    def __init__(self, adc_params=None, spi_params=None, led_config=None, btn_config=None, verbose=True):
+    def __init__(
+        self,
+        adc_params=None,
+        spi_params=None,
+        led_config=None,
+        btn_config=None,
+        verbose=True,
+    ):
         from machine import Pin
-        
+
         self.verbose = verbose
         self._adc_params = DEFAULT_ADC_PARAMS
         self._spi_params = DEFAULT_SPI_PARAMS
         self._led_config = DEFAULT_LED_CONFIG
         self._btn_config = DEFAULT_BTN_CONFIG
-        
+
         self._adc_params.update(adc_params or {})
         self._spi_params.update(spi_params or {})
         self._led_config.update(led_config or {})
         self._btn_config.update(btn_config or {})
-        
+
         # init LEDs
         self.leds = {}
         for label, pin in self._led_config.items():
@@ -62,13 +66,15 @@ class PeripheralManager:
         self._adc_buffer = []
         self._timing_buffer = []
         self._adc_scheduler = None
-        
+
         gc.collect()
-    
+
     def init(self):
-        from machine import Pin, SPI, ADC 
-        
-        self._adc = ADC(Pin(self._adc_params["adc_pin"])) #create ADC object on GPIO 33
+        from machine import Pin, SPI, ADC
+
+        self._adc = ADC(
+            Pin(self._adc_params["adc_pin"])
+        )  # create ADC object on GPIO 33
         self._adc.atten(self._adc_params["atten"])
         self._adc.width(self._adc_params["width"])
         if self.verbose:
@@ -82,22 +88,34 @@ class PeripheralManager:
         # local digiPot select pin = GPIO 5
         # set up button pin = GPIO 21
         get_param = lambda key: Pin(self._spi_params[key])
-        temp_spi_params = {key:get_param(key) for key in ['sck', 'miso', 'mosi']}
-        self._spi = SPI(self._spi_params["spi_num"], baudrate=10000000, polarity=0, phase=0, **temp_spi_params)
+        temp_spi_params = {key: get_param(key) for key in ["sck", "miso", "mosi"]}
+        self._spi = SPI(
+            self._spi_params["spi_num"],
+            baudrate=10000000,
+            polarity=0,
+            phase=0,
+            **temp_spi_params
+        )
         if self.verbose:
-            print('SPI initialised')
-            
-        output_gain = max(min(self._spi_params['output_amp_gain'], 255), 0)
+            print("SPI initialised")
+
+        output_gain = max(min(self._spi_params["output_amp_gain"], 255), 0)
         self.spi_write(output_gain)
         if self.verbose:
-            print('DigiPot set to {0} = gain of {1}'.format(output_gain, 1.745+(255-output_gain)/(19.2-1.745))) 
-            
-        gc.collect() 
-            
+            print(
+                "DigiPot set to {0} = gain of {1}".format(
+                    output_gain, 1.745 + (255 - output_gain) / (19.2 - 1.745)
+                )
+            )
+
+        gc.collect()
+
     @property
     def adc_running(self):
-        return not self._adc_scheduler is None # best proxy we have: no native micropython method
-            
+        return (
+            not self._adc_scheduler is None
+        )  # best proxy we have: no native micropython method
+
     def flash_led(self, label, freq, duration_sec):
         led = self.get_led(label)
         init_state = led.value()
@@ -148,7 +166,7 @@ class PeripheralManager:
         # devices can be added ad infinitum, with a unique id e.g. "lo" or "mix"
         data = bytearray([17, payload])
         self._spi.write(data)
-        
+
     def adc_read_to_buff(self, size=-1, record_timing=False):
         """Read adc and write to internal buffer.
 
@@ -159,7 +177,7 @@ class PeripheralManager:
             delta = time.ticks_us()
 
             self._timing_buffer = update_buffer(self._timing_buffer, delta, 20)
-        
+
         buff_size = self._adc_params["buffer_size"]
         if size < 0 or size > buff_size:
             size = buff_size
@@ -167,4 +185,4 @@ class PeripheralManager:
         self._adc_buffer = update_buffer(self._adc_buffer, data, buff_size)
 
     def adc_read(self, size=1):
-        return [self._adc.read() for i in range(size)] 
+        return [self._adc.read() for i in range(size)]

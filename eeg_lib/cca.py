@@ -302,7 +302,9 @@ class CCA:
             self.fit(X_test)
 
         result = {}
-        Cxx = np.dot(X_test, X_test.transpose()) # precompute data auto correlation matrix
+        Cxx = np.dot(
+            X_test, X_test.transpose()
+        )  # precompute data auto correlation matrix
         for f in self.stim_freqs:
             Y = cca_reference(
                 [f], self.fs, len(X_test), Nh=self.Nh, standardise_out=True

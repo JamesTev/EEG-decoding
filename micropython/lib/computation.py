@@ -31,11 +31,11 @@ def solve_gen_eig_prob(A, B, eps=1e-6):
 
 
 def solve_eig_qr(A, iterations=30):
-    
+
     """
     Use the QR iteration algorithm to iteratively solve for the eigenvectors and eigenvalues
     of a matrix A. Note: only guaranteed to recover exactly for symmetric matrices
-    with real eigenvalues. May work partially for asymmetric matrices (no complex support yet). 
+    with real eigenvalues. May work partially for asymmetric matrices (no complex support yet).
 
     Returns:
         `lam`: vector of eigenvalues
