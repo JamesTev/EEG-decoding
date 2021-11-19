@@ -117,4 +117,4 @@ class HTTPLogger(AbstractWebLogger):
         from lib.requests import MicroWebCli as requests
 
         payload = self._prepare_payload()
-        requests.POSTRequest(self.server, payload)
+        requests.JSONRequest(self.server, payload)

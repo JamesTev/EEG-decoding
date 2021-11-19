@@ -56,7 +56,7 @@ class BaseRunner:
         self.start_sample_timer()
 
         if self.logger is not None:
-            self.logger.start()
+            self.start_logger()
 
     def stop(self):
         if self.is_sampling:
