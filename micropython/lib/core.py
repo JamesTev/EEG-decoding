@@ -12,6 +12,8 @@ DOWNSAMPLED_FREQ = 64  # 64 Hz downsampled  to ensure nyquist condition
 
 PREPROCESSING = True  # if true, LP filter and downsample
 
+STIM_FREQS = [7, 10, 12]  # stimulus freqs. in Hz
+
 DEFAULT_LOG_SESSION = "test-{0}".format(time.ticks_ms())
 MODE = "log"
 
@@ -96,7 +98,10 @@ def preprocess_data(signal, downsample_freq=None):
 
     downsample_freq = downsample_freq or DOWNSAMPLED_FREQ
     ds_factor = ADC_SAMPLE_FREQ // downsample_freq
-    return sos_filter(signal)[::ds_factor]
+    signal = np.array(signal) - np.mean(signal)  # remove DC component
+
+    # downsample filtered signal by only selecting every `ds_factor` sample
+    return sos_filter(signal, fs=ADC_SAMPLE_FREQ)[::ds_factor]
 
 
 def read_and_decode(preprocessing=True):
@@ -104,7 +109,7 @@ def read_and_decode(preprocessing=True):
 
     data = periph_manager.read_adc_buffer()
     if len(data) <= 1:
-        return {freq: np.nan for freq in stim_freqs}
+        return {freq: np.nan for freq in STIM_FREQS}
     gc.collect()
     if preprocessing:
         data = preprocess_data(data)
@@ -119,28 +124,53 @@ def read_and_decode(preprocessing=True):
 
 
 def web_log_callback(*args, **kwargs):
-    adc_tim.deinit()
-    periph_manager.write_led("green", 1)
-    data = periph_manager.read_adc_buffer()
-    data = preprocess_data(data, downsample_freq=DOWNSAMPLED_FREQ)
-    if data is not None:
-        packed_data = {
-            "data": list(data),
-            "timestamp": time.ticks_us(),
-            "session_id": DEFAULT_LOG_SESSION,
-        }
-        requests.POSTRequest("http://james-tev.local:5000/", packed_data)
+    from lib.requests import MicroWebCli as requests
 
+    global periph_manager
+    global output_buffer
+    global sample_counter
+    global log_tim
+
+    log_tim.deinit()
+
+    periph_manager.write_led("green", 1)
+    packed_data = {
+        "data": output_buffer,
+        "timestamp": time.ticks_us(),
+        "session_id": DEFAULT_LOG_SESSION,
+    }
+    requests.POSTRequest("http://james-tev.local:5000/", packed_data)
+
+    sample_counter = 0
+    output_buffer = [0.0 for i in range(256)]
     periph_manager.write_led("green", 0)
-    adc_tim.init(freq=ADC_SAMPLE_FREQ, callback=sample_callback)
+
+    # restart log timer
+    log_tim.init(freq=log_freq, callback=web_log_callback)
 
 
 def sample_callback(*args, **kwargs):
+    from lib.utils import update_buffer
+
+    global periph_manager
+    global sample_counter
+    global output_buffer
+
     periph_manager.adc_read_to_buff(size=1)
+    sample_counter += 1
+
+    # this will only be true every 1s once buffer fills
+    if sample_counter == periph_manager._adc_params["buffer_size"]:
+        periph_manager.write_led("red", 1)
+        data = periph_manager.read_adc_buffer()
+        data = preprocess_data(data, downsample_freq=DOWNSAMPLED_FREQ)
+        output_buffer = update_buffer(output_buffer, list(data), 256)
+        sample_counter = 0
+        periph_manager.write_led("red", 0)
 
 
 def run():
-    from machine import Pin, Timer
+    from machine import Timer
     from lib.networking import pack_payload
 
     global periph_manager

@@ -16,12 +16,12 @@ def default_sub_cb(topic, msg):
 env_vars = load_env_vars("lib/.env")
 
 
-def setup_mqtt_client(client_id=None, callback=None):
+def setup_mqtt_client(client_id=None, server=None, port=None, callback=None):
 
-    server = env_vars.get("MQTT_SERVER")
-    port = env_vars.get("MQTT_PORT")
+    server = server or env_vars.get("MQTT_SERVER")
+    port = port or env_vars.get("MQTT_PORT")
 
-    client_id = client_id or "james-esp32-" + rand_str(l=5)
+    client_id = client_id or "eeg-esp32-" + rand_str(l=5)
     client = MQTTClient(
         client_id=client_id, server=server, port=port, keepalive=6000, ssl=False
     )
