@@ -1,5 +1,9 @@
 from scheduling import ScheduledFunc
 import ujson as json
+from utils import Enum
+import config
+
+logger_types = Enum(["SERIAL", "MQTT", "HTTP"])
 
 
 class BaseLogger(ScheduledFunc):
@@ -15,7 +19,7 @@ class BaseLogger(ScheduledFunc):
         self.tim.init(freq=self.freq, callback=self.log)
 
 
-class WebLogger(BaseLogger):
+class AbstractWebLogger(BaseLogger):
     def __init__(
         self,
         period_sec,
@@ -23,7 +27,6 @@ class WebLogger(BaseLogger):
         raw_data_ref,
         timer_num=1,
         server=None,
-        port=None,
         send_raw=False,
     ):
         super().__init__(period_sec, decoded_ref, raw_data_ref, timer_num=timer_num)
@@ -33,7 +36,6 @@ class WebLogger(BaseLogger):
 
         self.send_raw = send_raw  # whether or not to send full raw data
         self.server = server
-        self.port = port
 
     def _prepare_payload(self, payload_id=None):
         from lib.networking import pack_payload
@@ -42,7 +44,8 @@ class WebLogger(BaseLogger):
 
         return pack_payload(raw_data, self.decoded_data, user_id=payload_id)
 
-class MQTTLogger(WebLogger):
+
+class MQTTLogger(AbstractWebLogger):
     def __init__(
         self,
         period_sec,
@@ -61,7 +64,6 @@ class MQTTLogger(WebLogger):
             raw_data_ref,
             timer_num=timer_num,
             server=server,
-            port=port,
             send_raw=send_raw,
         )
 
@@ -90,7 +92,8 @@ class MQTTLogger(WebLogger):
         payload = self._prepare_payload()
         self.client.publish(topic=self.topic, msg=payload, qos=self.qos)
 
-class HTTPLogger(WebLogger):
+
+class HTTPLogger(AbstractWebLogger):
     def __init__(
         self,
         period_sec,
@@ -98,7 +101,6 @@ class HTTPLogger(WebLogger):
         raw_data_ref,
         timer_num=1,
         server=None,
-        port=None,
         send_raw=False,
     ):
         super().__init__(
@@ -107,10 +109,10 @@ class HTTPLogger(WebLogger):
             raw_data_ref,
             timer_num=timer_num,
             server=server,
-            port=port,
             send_raw=send_raw,
         )
-    
+        self.server = server or config.HTTP_LOG_URL
+
     def log(self, *args):
         from lib.requests import MicroWebCli as requests
 

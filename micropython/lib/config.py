@@ -18,4 +18,4 @@ DEFAULT_LOG_SESSION = "test-{0}".format(utime.ticks_ms())
 
 MODE = "log"
 
-LOG_URL = "http://james-tev.local:5000/"
+HTTP_LOG_URL = "http://james-tev.local:5000/"

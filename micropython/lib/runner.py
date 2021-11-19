@@ -1,5 +1,7 @@
+from micropython.lib.logging import BaseLogger
 from .peripherals import PeripheralManager
 from ulab import numpy as np
+from logging import BaseLogger, MQTTLogger, HTTPLogger, logger_types
 
 import gc
 import config
@@ -27,8 +29,13 @@ class BaseRunner:
         self.buffer_size = 256  # TODO: update this to be populated dynamically
 
         self.output_buffer = [0.0 for i in range(self.buffer_size)]
+        self.decoded_output = {}
 
-    def setup(self, spi_params=None, adc_params=None):
+        self.is_setup = False
+        self.is_sampling = False
+        self.is_logging = False
+
+    def setup(self, spi_params=None, adc_params=None, log_period=5, logger_type=None):
         from machine import freq
 
         freq(config.BASE_CLK_FREQ)  # set the CPU frequency
@@ -38,6 +45,26 @@ class BaseRunner:
 
         self._init_peripherals(spi_params, adc_params)
         gc.collect()
+
+        self._setup_logger(log_period, logger_type)
+        gc.collect()
+
+        self.is_setup = True
+
+    def run(self):
+        if not self.is_setup:
+            raise ValueError("Runner not setup. Call `.setup()` before running.")
+        self.start_sample_timer()
+
+        if self.logger is not None:
+            self.logger.start()
+
+    def stop(self):
+        if self.is_sampling:
+            self.stop_sample_timer()
+
+        if self.is_logging:
+            self.stop_logger()
 
     def preprocess_data(self, signal):
 
@@ -79,9 +106,9 @@ class BaseRunner:
 
         result = self.decoder.compute_corr(data)
 
-        decoded_result = {freq: round(corr[0], 5) for freq, corr in result.items()}
+        self.decoded_output = {freq: round(corr[0], 5) for freq, corr in result.items()}
         gc.collect()
-        return decoded_result
+        return self.decoded_output
 
     def sample_callback(self, *args, **kwargs):
         from lib.utils import update_buffer
@@ -102,6 +129,16 @@ class BaseRunner:
     def read_output_buffer(self):
         return self.output_buffer
 
+    def start_logger(self):
+        if self.logger is not None:
+            self.logger.start()
+            self.is_logging = True
+
+    def stop_logger(self):
+        if self.logger is not None:
+            self.logger.stop()
+            self.is_logging = False
+
     def start_sample_timer(self):
         from machine import Timer
 
@@ -109,10 +146,12 @@ class BaseRunner:
         self.sample_timer.init(
             freq=self.base_sample_freq, callback=self.sample_callback
         )
+        self.is_sampling = True
 
     def stop_sample_timer(self):
         if self.sample_timer is not None:
             self.sample_timer.deinit()
+            self.is_sampling = False
 
     @property
     def downsampling_factor(self):
@@ -130,7 +169,6 @@ class BaseRunner:
             spi_params=spi_params, adc_params=adc_params
         )
         self.periph_manager.init()
-        self.start_sample_timer()
 
     def _init_decoder(self):
         from lib.decoding import CCA
@@ -139,50 +177,47 @@ class BaseRunner:
         # preprocessing is disabled
         self.decoder = CCA(self.stim_freqs, self.downsampled_freq)
 
+    def _setup_logger(self, log_period, logger_type):
+        if logger_type is not None:
+            if logger_type != logger_types.SERIAL:
+                print(
+                    "Warning: only the `SERIAL` logger type is available offline. Defaulting to this."
+                )
+            self.logger = BaseLogger(
+                log_period, self.decoded_output, self.output_buffer
+            )
+        else:
+            self.logger = None
 
-class Runner(BaseRunner):
-    def setup(self, spi_params=None, adc_params=None, log_period=5):
+
+class OnlineRunner(BaseRunner):
+    def setup(
+        self,
+        spi_params=None,
+        adc_params=None,
+        log_period=5,
+        logger_type=None,
+        **logger_params
+    ):
         super().setup(spi_params=spi_params, adc_params=adc_params)
         gc.collect()
 
         self.configure_wifi(env_path="lib/.env")
         gc.collect()
 
-        self.log_period = log_period
-        self.start_logger()
+        self._setup_logger(log_period, logger_type, **logger_params)
 
-    def web_log_callback(self, *args, **kwargs):
-        from lib.requests import MicroWebCli as requests
-        import utime as time
-
-        # pause timer while async request completes
-        self.log_timer.deinit()
-
-        self.periph_manager.write_led("green", 1)
-        packed_data = {
-            "data": self.output_buffer,
-            "timestamp": time.ticks_us(),
-            "session_id": self.log_session,
-        }
-        requests.POSTRequest(self.log_url, packed_data)
-
-        self.periph_manager.write_led("green", 0)
-
-        # restart log timer
-        self.log_timer.init(freq=self.log_freq, callback=self.web_log_callback)
-
-    def start_logger(self):
-        from machine import Timer
-
-        self.log_timer = Timer(1)
-        self.log_session = config.DEFAULT_LOG_SESSION
-        self.log_url = config.LOG_URL
-
-        self.log_timer.init(freq=self.log_freq, callback=self.web_log_callback)
-
-    def stop_logger(self):
-        if self.log_timer is not None:
-            self.log_timer.deinit()
+    def _setup_logger(self, log_period, logger_type, **logger_params):
+        if logger_type is not None:
+            base_logger_args = [log_period, self.decoded_output, self.output_buffer]
+            if logger_type == logger_types.MQTT:
+                self.logger = MQTTLogger(*base_logger_args, **logger_params)
+            elif logger_type == logger_types.HTTP:
+                self.logger = HTTPLogger(*base_logger_args, **logger_params)
+            else:
+                self.logger = BaseLogger(*base_logger_args)
+        else:
+            self.logger = None
 
     @staticmethod
     def configure_wifi(env_path=".env"):

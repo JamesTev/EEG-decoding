@@ -49,6 +49,6 @@ def pack_payload(raw_data, decoded_data, user_id=None):
         "eeg_data": raw_data,
         "eeg_data_len": len(raw_data),
         "decoded_eeg_data": decoded_data,
-        "timestamp": time.ticks_us()
+        "timestamp": time.ticks_us(),
     }
     return json.dumps(payload)

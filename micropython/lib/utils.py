@@ -1,3 +1,14 @@
+class Enum(set):
+    """
+    Class to simulate the behaviour of an enum type
+    """
+
+    def __getattr__(self, name):
+        if name in self:
+            return name
+        raise AttributeError
+
+
 def delay_ms(t):
     import utime
 
