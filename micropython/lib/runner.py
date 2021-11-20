@@ -48,6 +48,7 @@ class BaseRunner:
     def run(self):
         if not self.is_setup:
             raise ValueError("Runner not setup. Call `.setup()` before running.")
+            
         self.start_sample_timer()
 
         if self.logger is not None:
