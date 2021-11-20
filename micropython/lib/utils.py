@@ -17,11 +17,19 @@ def delay_ms(t):
         pass  # TODO: investigate if this will actually free core during delay
 
 
-def update_buffer(buf, el, max_size):
+def update_buffer(buf, el, max_size, inplace=True):
+    if max_size != len(buf):
+        inplace=False
+        
     if type(el) in [float, int]:
         el = [el]
     el = el[-max_size:]
-    return (buf[-(max_size - len(el)) :] + el)[-max_size:]
+    tmp = (buf[-(max_size - len(el)) :] + el)[-max_size:]
+    if inplace:
+        for i, el in enumerate(tmp):
+            buf[i] = el
+        return None
+    return tmp
 
 
 def connect_wifi(ssid, password):

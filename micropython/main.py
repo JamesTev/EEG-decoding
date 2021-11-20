@@ -1,10 +1,10 @@
-from machine import Pin
-import gc
+import gc 
+from micropython import alloc_emergency_exception_buf
 
-from lib.core import initialise, run
+# allocate exception buffer for ISRs
+alloc_emergency_exception_buf(100)
 
-gc.collect()  # free up any memory used in imports
-
-initialise()
+# enable and configure garbage collection
+gc.enable()
 gc.collect()
-run()
+gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())

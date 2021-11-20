@@ -5,12 +5,7 @@ from logging import BaseLogger, MQTTLogger, HTTPLogger, logger_types
 import gc
 import config
 
-# enable and configure garbage collection
-gc.enable()
-gc.collect()
-gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
-
-
+from micropython import schedule
 class BaseRunner:
     def __init__(self, stimulus_freqs=None) -> None:
         if stimulus_freqs is None:
@@ -82,30 +77,23 @@ class BaseRunner:
         # downsample filtered signal by only selecting every `ds_factor` sample
         return sos_filter(signal, fs=self.base_sample_freq)[::ds_factor]
 
-    def read_and_decode(self):
+    def decode(self, *args):
+        """
+        Run decoding on current state of output buffer.
 
-        data = self._read_internal_buffer(preprocess=self.preprocessing_enabled)
-        if len(data) <= 1:
-            return {freq: np.nan for freq in self.stim_freqs}
-        gc.collect()
-
-        data = np.array(data).reshape((1, len(data)))
-        gc.collect()
-
-        result = self.decoder.compute_corr(data)
-
-        decoded_result = {freq: round(corr[0], 5) for freq, corr in result.items()}
-        gc.collect()
-        return decoded_result
-
-    def decode(self):
+        Note that `*args` is specified but not used directly: this allows
+        this function to be called using `micropython.schedule` which
+        requires the scheduled func to accept an argument.
+        """
         data = np.array(self.output_buffer)
         data = data.reshape((1, len(data)))  # reshape to row vector
         gc.collect()
 
         result = self.decoder.compute_corr(data)
 
-        self.decoded_output = {freq: round(corr[0], 5) for freq, corr in result.items()}
+        # note: need to be careful not to change the memory address of this variable using direct 
+        # assignment since the logger depends on this reference. Also would just be inefficient.
+        self.decoded_output.update({freq: round(corr[0], 5) for freq, corr in result.items()})
         gc.collect()
         return self.decoded_output
 
@@ -119,11 +107,22 @@ class BaseRunner:
         if self.sample_counter >= self.buffer_size:
             self.periph_manager.write_led("red", 1)
             data = self._read_internal_buffer(preprocess=self.preprocessing_enabled)
-            self.output_buffer = update_buffer(
-                self.output_buffer, list(data), self.buffer_size
+            update_buffer(
+                self.output_buffer, list(data), self.buffer_size, inplace=True
             )
             self.sample_counter = 0
             self.periph_manager.write_led("red", 0)
+
+            # TODO: workout how to run decoding in another handler as 
+            # this could take a non-negligible amount of time which
+            # would disrupt consistency of sampling freq. For now,
+            # we can schedule this function to run 'soon' while allowing other
+            # ISRs to interrupt it if need be.
+            try:
+                schedule(self.decode, None)
+            except RuntimeError:
+                # if schedule queue is full, run now
+                self.decode()
 
     def read_output_buffer(self):
         return self.output_buffer
