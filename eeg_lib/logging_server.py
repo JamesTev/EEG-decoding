@@ -5,7 +5,7 @@ import time
 
 app = Flask(__name__)
 
-DEFAULT_FILENAME = "log_data.json"
+DEFAULT_FILENAME = "./logs/log_data.json"
 
 
 def write_json(filename, data):
@@ -28,16 +28,19 @@ def log_data(payload, filename=None):
         existing_data = {}
 
     if session_id in existing_data:
-        existing_data[session_id].append(payload.get("data"))
+        existing_data[session_id].append(payload)
+        del payload['session_id']
     else:
-        existing_data[session_id] = [payload.get("data")]
+        existing_data[session_id] = [payload]
     write_json(filename, existing_data)
     print(f"Log file {filename} updated successfully.")
 
 
 @app.route("/", methods=["POST"])
 def save_data():
-    data = request.form.to_dict()
+    data = request.get_json(force=True)
+    if isinstance(data, str):
+        data = json.loads(data)
     if data is not None:
         log_data(data)
         return jsonify(msg="data stored successfully"), 200
