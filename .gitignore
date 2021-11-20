@@ -1,4 +1,3 @@
-eeg_env/
 __pycache__
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -122,11 +121,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
-.pyre/
-
 *.npz
 /plots
 /data
 micropython/mpy-modules/*.mpy
 .DS_store
+eeg_lib/logs/

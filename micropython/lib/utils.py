@@ -19,8 +19,8 @@ def delay_ms(t):
 
 def update_buffer(buf, el, max_size, inplace=True):
     if max_size != len(buf):
-        inplace=False
-        
+        inplace = False
+
     if type(el) in [float, int]:
         el = [el]
     el = el[-max_size:]

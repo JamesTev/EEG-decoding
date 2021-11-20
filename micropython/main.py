@@ -1,4 +1,4 @@
-import gc 
+import gc
 from micropython import alloc_emergency_exception_buf
 
 # allocate exception buffer for ISRs

@@ -46,9 +46,9 @@ def pack_payload(raw_data, decoded_data, user_id=None, session_id=None):
         "timestamp": time.ticks_us(),
     }
     if session_id is not None:
-        payload['session_id'] = session_id
-        
+        payload["session_id"] = session_id
+
     if user_id is not None:
-        payload['user_id'] = user_id
+        payload["user_id"] = user_id
 
     return json.dumps(payload)

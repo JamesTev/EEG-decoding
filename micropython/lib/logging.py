@@ -28,7 +28,7 @@ class AbstractWebLogger(BaseLogger):
         timer_num=1,
         server=None,
         send_raw=False,
-        session_id=None
+        session_id=None,
     ):
         super().__init__(period_sec, decoded_ref, raw_data_ref, timer_num=timer_num)
 
@@ -37,9 +37,8 @@ class AbstractWebLogger(BaseLogger):
 
         self.send_raw = send_raw  # whether or not to send full raw data
         self.server = server
-        self.session_id = session_id # used to identify logging sessions 
+        self.session_id = session_id  # used to identify logging sessions
 
-    
     def set_session_id(self, id):
         self.session_id = id
 
@@ -48,8 +47,10 @@ class AbstractWebLogger(BaseLogger):
 
         raw_data = self.raw_data if self.send_raw else []
 
-        return pack_payload(raw_data, self.decoded_data, user_id=payload_id, session_id=self.session_id)
-    
+        return pack_payload(
+            raw_data, self.decoded_data, user_id=payload_id, session_id=self.session_id
+        )
+
 
 class MQTTLogger(AbstractWebLogger):
     def __init__(
@@ -63,7 +64,7 @@ class MQTTLogger(AbstractWebLogger):
         session_id=None,
         port=None,
         qos=1,
-        topic=None
+        topic=None,
     ):
         super().__init__(
             period_sec,
@@ -72,7 +73,7 @@ class MQTTLogger(AbstractWebLogger):
             timer_num=timer_num,
             server=server,
             send_raw=send_raw,
-            session_id=session_id
+            session_id=session_id,
         )
 
         from lib.networking import setup_mqtt_client, get_default_topic
@@ -110,7 +111,7 @@ class HTTPLogger(AbstractWebLogger):
         timer_num=1,
         server=None,
         send_raw=False,
-        session_id=None
+        session_id=None,
     ):
         super().__init__(
             period_sec,
@@ -119,7 +120,7 @@ class HTTPLogger(AbstractWebLogger):
             timer_num=timer_num,
             server=server,
             send_raw=send_raw,
-            session_id=session_id
+            session_id=session_id,
         )
         self.server = server or config.HTTP_LOG_URL
 

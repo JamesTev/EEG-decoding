@@ -29,7 +29,7 @@ def log_data(payload, filename=None):
 
     if session_id in existing_data:
         existing_data[session_id].append(payload)
-        del payload['session_id']
+        del payload["session_id"]
     else:
         existing_data[session_id] = [payload]
     write_json(filename, existing_data)

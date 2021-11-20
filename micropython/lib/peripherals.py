@@ -63,7 +63,7 @@ class PeripheralManager:
         for label, pin in self._btn_config.items():
             self.buttons[label] = Pin(pin, Pin.IN)
 
-        self._adc_buffer = [0.0 for i in range(self._adc_params['buffer_size'])]
+        self._adc_buffer = [0.0 for i in range(self._adc_params["buffer_size"])]
         self._timing_buffer = []
         self._adc_scheduler = None
 
@@ -178,7 +178,7 @@ class PeripheralManager:
             n_samples = 20
             if len(self._timing_buffer) == 0:
                 self._timing_buffer = [0 for i in range(n_samples)]
-            
+
             update_buffer(self._timing_buffer, delta, n_samples)
 
         buff_size = self._adc_params["buffer_size"]

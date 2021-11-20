@@ -6,6 +6,8 @@ import gc
 import config
 
 from micropython import schedule
+
+
 class BaseRunner:
     def __init__(self, stimulus_freqs=None) -> None:
         if stimulus_freqs is None:
@@ -48,7 +50,7 @@ class BaseRunner:
     def run(self):
         if not self.is_setup:
             raise ValueError("Runner not setup. Call `.setup()` before running.")
-            
+
         self.start_sample_timer()
 
         if self.logger is not None:
@@ -92,9 +94,11 @@ class BaseRunner:
 
         result = self.decoder.compute_corr(data)
 
-        # note: need to be careful not to change the memory address of this variable using direct 
+        # note: need to be careful not to change the memory address of this variable using direct
         # assignment since the logger depends on this reference. Also would just be inefficient.
-        self.decoded_output.update({freq: round(corr[0], 5) for freq, corr in result.items()})
+        self.decoded_output.update(
+            {freq: round(corr[0], 5) for freq, corr in result.items()}
+        )
         gc.collect()
         return self.decoded_output
 
@@ -114,7 +118,7 @@ class BaseRunner:
             self.sample_counter = 0
             self.periph_manager.write_led("red", 0)
 
-            # TODO: workout how to run decoding in another handler as 
+            # TODO: workout how to run decoding in another handler as
             # this could take a non-negligible amount of time which
             # would disrupt consistency of sampling freq. For now,
             # we can schedule this function to run 'soon' while allowing other
