@@ -8,7 +8,7 @@ import config
 from micropython import schedule
 
 
-class BaseRunner:
+class Runner:
     def __init__(self, stimulus_freqs=None) -> None:
         if stimulus_freqs is None:
             self.stim_freqs = config.STIM_FREQS  # assign defaults
@@ -193,7 +193,7 @@ class BaseRunner:
             self.logger = None
 
 
-class OnlineRunner(BaseRunner):
+class OnlineRunner(Runner):
     def setup(
         self,
         spi_params=None,

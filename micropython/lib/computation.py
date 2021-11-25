@@ -91,7 +91,7 @@ def max_eig(A, iterations, numeric_method="qr"):
         else:
             if numeric_method != "qr":
                 print("Unknown `numeric_method` arg: defaulting to QR solver")
-            lam, v = solve_eig_qr(A, 1, lam_iterations=iterations)
+            lam, v = solve_eig_qr(A, iterations)
             lam = lam[0]  # only need first eigen val (largest returned first)
             v = v[:, 0]  # only first eig vector
 
@@ -104,8 +104,8 @@ def resample(X, factor):
 
 
 def standardise(X):
-    axis = np.argmax(X.shape())
-    minor_shape = np.min(X.shape())
+    axis = np.argmax(X.shape)
+    minor_shape = np.min(X.shape)
     mu = np.mean(X, axis=axis).reshape((minor_shape, 1))
     sigma = np.std(X, axis=axis).reshape((minor_shape, 1))
     return (X - mu) / sigma
@@ -113,7 +113,7 @@ def standardise(X):
 
 def cov(X, Y, biased=False):
     assert (
-        X.shape() == Y.shape() and len(X.shape()) == 1
+        X.shape == Y.shape and len(X.shape) == 1
     ), "Expected data vectors of equal length"
     assert len(X) > 1, "At least 2 data points are required"
 
@@ -126,7 +126,7 @@ def cov(X, Y, biased=False):
 
 def corr(X, Y):
     assert (
-        X.shape() == Y.shape() and len(X.shape()) == 1
+        X.shape == Y.shape and len(X.shape) == 1
     ), "Expected data vectors of equal length"
     assert len(X) > 1, "At least 2 data points are required"
 

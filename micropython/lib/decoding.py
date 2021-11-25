@@ -52,7 +52,7 @@ def harmonic_reference(f0, fs, Ns, Nh=1, standardise_out=False):
       Ns              : # of samples in trial
       Nh          : # of harmonics
     Output:
-      y_ref           : Generated reference signals with shape (Nf, Ns, 2*Nh)
+      X           : Generated reference signals with shape (Nf, Ns, 2*Nh)
     """
     X = np.zeros((Nh * 2, Ns))
 
