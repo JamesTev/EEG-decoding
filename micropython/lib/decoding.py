@@ -204,7 +204,7 @@ class DecoderSSVEP():
             elif algo == 'GCCA':
                 decoder_f = SingleChannelGCCA(f, self.fs, Nh=1)
             else:
-                raise ValueError("Invalid algorithm. Must be one of {}".format(decoding_algos))
+                raise ValueError("Invalid algorithm. Must be one of {}".format(self.decoding_algos))
             
             self.decoder_stack[f] = decoder_f
     

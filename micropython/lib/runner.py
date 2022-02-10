@@ -9,7 +9,7 @@ from micropython import schedule
 
 
 class Runner:
-    def __init__(self, decoding_algo, stimulus_freqs=None) -> None:
+    def __init__(self, decoding_algo, buffer_size=256, stimulus_freqs=None) -> None:
         if stimulus_freqs is None:
             self.stim_freqs = config.STIM_FREQS  # assign defaults
 
@@ -24,7 +24,7 @@ class Runner:
             self.downsampled_freq = config.DOWNSAMPLED_FREQ
 
         self.sample_counter = 0
-        self.buffer_size = 256  # TODO: update this to be populated dynamically
+        self.buffer_size = buffer_size  # TODO: update this to be populated dynamically
 
         self.output_buffer = [0.0 for i in range(self.buffer_size)]
         self.decoded_output = {}
@@ -52,6 +52,10 @@ class Runner:
     def run(self):
         if not self.is_setup:
             raise ValueError("Runner not setup. Call `.setup()` before running.")
+
+        if self.decoder.requires_calibration and not self.is_calibrated:
+            print("Warning: decoder has not been fully calibrated. Please provide calibration data for\
+                each stimulus frequency and call `.calibrate()`")
 
         self.start_sample_timer()
 
@@ -82,6 +86,9 @@ class Runner:
         # downsample filtered signal by only selecting every `ds_factor` sample
         return sos_filter(signal, fs=self.base_sample_freq)[::ds_factor]
 
+    def calibrate(self, calibration_data_map):
+        self.decoder.calibrate(calibration_data_map)
+
     def decode(self, *args):
         """
         Run decoding on current state of output buffer.
@@ -94,12 +101,12 @@ class Runner:
         data = data.reshape((1, len(data)))  # reshape to row vector
         gc.collect()
 
-        result = self.decoder.compute_corr(data)
+        result = self.decoder.classify(data)
 
         # note: need to be careful not to change the memory address of this variable using direct
         # assignment since the logger depends on this reference. Also would just be inefficient.
         self.decoded_output.update(
-            {freq: round(corr[0], 5) for freq, corr in result.items()}
+            {freq: round(corr, 5) for freq, corr in result.items()}
         )
         gc.collect()
         return self.decoded_output
@@ -161,6 +168,10 @@ class Runner:
     @property
     def downsampling_factor(self):
         return self.base_sample_freq // self.downsampled_freq
+
+    @property
+    def is_calibrated(self):
+        return self.decoder.is_calibrated
 
     def _read_internal_buffer(self, preprocess=False):
         data = self.periph_manager.read_adc_buffer()
