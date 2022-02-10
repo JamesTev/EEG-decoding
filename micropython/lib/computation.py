@@ -1,8 +1,10 @@
 from ulab import numpy as np
 import urandom
 
+from lib.decoding import harmonic_reference
+from lib.computation import solve_gen_eig_prob, corr
 
-def solve_gen_eig_prob(A, B, eps=1e-6):
+def solve_gen_eig_prob(A, B, eps=1e-5):
     """
     Solves the generalised eigenvalue problem of the form:
     Aw = \lambda*Bw
@@ -21,7 +23,14 @@ def solve_gen_eig_prob(A, B, eps=1e-6):
     Lam_b_sq = replace_nan(Lam_b ** 0.5) + np.eye(len(Lam_b)) * eps
     Phi_b_hat = np.dot(Phi_b, np.linalg.inv(Lam_b_sq))
     A_hat = np.dot(np.dot(Phi_b_hat.transpose(), A), Phi_b_hat)
-    Lam_a, Phi_a = np.linalg.eig(A_hat)
+
+    try:
+        Lam_a, Phi_a = np.linalg.eig(A_hat)
+    except ValueError:
+        # if `ulab` raises a "input matrix asymmetric" error in analytical approach, 
+        # we have to estimate eigen-pair iteratively
+        Lam_a, Phi_a = solve_eig_qr(A_hat)
+
     Lam_a = np.eye(len(Lam_a)) * Lam_a
 
     Lam = Lam_a
@@ -99,6 +108,9 @@ def max_eig(A, iterations, numeric_method="qr"):
 
 
 def resample(X, factor):
+    """
+    Perform downsampling of signal `X` by an integer `factor`.
+    """
     idx_rs = np.arange(0, len(X) - 1, factor)
     return X[idx_rs]
 
@@ -135,3 +147,38 @@ def corr(X, Y):
 
 def replace_nan(A, rep=0):
     return np.where(np.isfinite(A), A, rep)
+
+def col_concat(*mats):
+    """"
+    Concatenate a variable number of matrices along their 
+    column axis (axis=1 using `numpy` convention).
+    """
+    cols = sum([mat.shape[1] for mat in mats])
+    rows = mats[0].shape[0]
+    out = np.zeros((rows, cols))
+    j = 0
+    for mat in mats:
+        mat_cols = mat.shape[1]
+        out[:, j:j+mat_cols] = mat
+        j += mat_cols
+        
+    return out
+
+def zeros_like(A):
+    return np.zeros(A.shape)
+
+def block_diag(X, Y, reverse=False):
+    if not reverse:
+        X = np.concatenate((X, zeros_like(X)), axis=1)
+        Y = np.concatenate((zeros_like(Y), Y), axis=1)
+    else:
+        X = np.concatenate((zeros_like(X), X), axis=1)
+        Y = np.concatenate((Y, zeros_like(Y)), axis=1)
+    return np.concatenate((X, Y), axis=0)
+
+def sign(x):
+    """
+    Return the sign of a numerical variable.
+    """
+    x+1 # arb operation to raise an error if non-numeric arg given.
+    return 1 if x >=0 else -1
