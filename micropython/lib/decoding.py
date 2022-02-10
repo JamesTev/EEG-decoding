@@ -13,10 +13,13 @@ class SingleChannelMsetCCA():
     """
     def __init__(self):
         self.Ns, self.Nt = None, None
+        self.Y = None
         
     def fit(self, X, compress_ref=True): 
         """
-        Expects a training matrix X of shape Nt x Ns. If `compress_ref=True`, the `Nt` components in optimised reference signal Y will be averaged to form a single reference vector. This can be used for memory optimisation but will likely degrade performance slightly.
+        Expects a training matrix X of shape Nt x Ns. If `compress_ref=True`, the `Nt` components in optimised 
+        reference signal Y will be averaged to form a single reference vector. This can be used for memory 
+        optimisation but will likely degrade performance slightly.
         """
         if X.shape[0] > X.shape[1]:
             print("Warning: received more trials than samples. This is unusual behaviour: check X")
@@ -30,12 +33,16 @@ class SingleChannelMsetCCA():
         if compress_ref:
             self.Y = np.mean(Y, axis=0).reshape((1, max(Y.shape))) # this will average Nt components in Y: Nc x Nt -> 1 x Nt
     
-    def compute(self, X_test):
-        if self.Y is None:
+    def compute_corr(self, X_test):
+        if not self.is_calibrated:
             raise ValueError("Reference matrix Y must be computed using  fit  before computing corr")
         if len(X_test.shape) == 1:
             X_test = X_test.reshape((1, len(X_test)))
         return CCA.cca_eig(X_test, self.Y)[0] # use ordinary CCA with optimised ref. Y
+    
+    @property
+    def is_calibrated(self):
+        return self.Y is not None
 
 class SingleChannelGCCA(): 
     """
@@ -84,11 +91,11 @@ class SingleChannelGCCA():
         self.w = W_eig[:, np.argmax(lam)] # optimal spatial filter vector with dim (2*Nc + 2*Nh)
         self.X_bar = X_bar
         
-    def compute(self, X_test):
+    def compute_corr(self, X_test):
         """
         Compute output correlation for a test observation with dim. (1 x Ns)
         """
-        if self.w is None:
+        if not self.is_calibrated:
             raise ValueError("call .fit(X_train) before performing classification.")
             
         if len(X_test.shape) == 1:
@@ -109,26 +116,26 @@ class SingleChannelGCCA():
         rho2 = corr(X_test_image, np.dot(Y.T, w_Y))
         
         return sum([sign(rho_i)*rho_i**2 for rho_i in [rho1, rho2]])/2
+    
+    @property
+    def is_calibrated(self):
+        return self.w is not None
 class CCA:
-    def __init__(self, stim_freqs, fs, Nh=2):
+    def __init__(self, f_ssvep, fs, Nh=1):
         self.Nh = Nh
-        self.stim_freqs = stim_freqs
         self.fs = fs
+        self.f_ssvep = f_ssvep
 
     def compute_corr(self, X_test):
-        result = {}
         Cxx = np.dot(
             X_test, X_test.transpose()
         )  # precompute data auto correlation matrix
-        for f in self.stim_freqs:
-            Y = harmonic_reference(
-                f, self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False
-            )
-            rho = self.cca_eig(
-                X_test, Y, Cxx=Cxx
-            )  # canonical variable matrices. Xc = X^T.W_x
-            result[f] = rho
-        return result
+        Y = harmonic_reference(
+                self.f_ssvep, self.fs, np.max(X_test.shape), Nh=self.Nh, standardise_out=False
+        )
+        return self.cca_eig(
+            X_test, Y, Cxx=Cxx
+        )[0]  # canonical variable matrices. Xc = X^T.W_x
 
     @staticmethod
     def cca_eig(X, Y, Cxx=None, eps=1e-6):
@@ -176,3 +183,56 @@ def harmonic_reference(f0, fs, Ns, Nh=1, standardise_out=False):
     if standardise_out:  # zero mean, unit std. dev
         return standardise(X)
     return X
+
+class DecoderSSVEP():
+    
+    decoding_algos = ['CCA', 'MsetCCA', 'GCCA']
+    
+    def __init__(self, stim_freqs, fs, algo):
+                    
+        self.stim_freqs = stim_freqs 
+        self.fs = fs
+        self.algo = algo
+        
+        self.decoder_stack = {}
+        
+        for f in self.stim_freqs:
+            if algo == 'CCA':
+                decoder_f = CCA(f, self.fs, Nh=1)
+            elif algo == 'MsetCCA':
+                decoder_f = SingleChannelMsetCCA()
+            elif algo == 'GCCA':
+                decoder_f = SingleChannelGCCA(f, self.fs, Nh=1)
+            else:
+                raise ValueError("Invalid algorithm. Must be one of {}".format(decoding_algos))
+            
+            self.decoder_stack[f] = decoder_f
+    
+    @property
+    def requires_calibration(self):
+        return self.algo in ['MsetCCA', 'GCCA']
+    
+    @property
+    def is_calibrated(self):
+        return all([d.is_calibrated for d in self.decoder_stack.values()])
+    
+    def calibrate(self, calibration_data_map):
+        
+        if not self.requires_calibration:
+            print("Warning: trying to fit data with an algorithm that doesn't require calibration")
+            return
+        
+        for freq, cal_data in calibration_data_map.items():
+            if freq not in self.stim_freqs:
+                raise ValueError("Invalid stimulus frequency supplied")
+            self.decoder_stack[freq].fit(cal_data)
+            
+    def classify(self, X_test):
+        result = {}
+        for f, decoder_f in self.decoder_stack.items():
+            if self.requires_calibration and not decoder_f.is_calibrated:
+                print("Warning: decoder has not been calibrated for {}Hz stimulus frequency".format(f))
+                result[f] = np.nan
+            else:    
+                result[f] = decoder_f.compute_corr(X_test)
+        return result   

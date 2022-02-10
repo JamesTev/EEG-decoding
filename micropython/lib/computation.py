@@ -1,9 +1,6 @@
 from ulab import numpy as np
 import urandom
 
-from lib.decoding import harmonic_reference
-from lib.computation import solve_gen_eig_prob, corr
-
 def solve_gen_eig_prob(A, B, eps=1e-5):
     """
     Solves the generalised eigenvalue problem of the form:

@@ -9,9 +9,11 @@ from micropython import schedule
 
 
 class Runner:
-    def __init__(self, stimulus_freqs=None) -> None:
+    def __init__(self, decoding_algo, stimulus_freqs=None) -> None:
         if stimulus_freqs is None:
             self.stim_freqs = config.STIM_FREQS  # assign defaults
+
+        self.decoding_algo = decoding_algo
 
         self.base_sample_freq = config.ADC_SAMPLE_FREQ
         self.downsampled_freq = config.DOWNSAMPLED_FREQ
@@ -174,11 +176,11 @@ class Runner:
         self.periph_manager.init()
 
     def _init_decoder(self):
-        from lib.decoding import CCA
+        from lib.decoding import DecoderSSVEP
 
         # note: downsampled_freq is same as base sampling freq if
         # preprocessing is disabled
-        self.decoder = CCA(self.stim_freqs, self.downsampled_freq)
+        self.decoder = DecoderSSVEP(self.stim_freqs, self.downsampled_freq, self.decoding_algo)
 
     def _setup_logger(self, log_period, logger_type):
         if logger_type is not None:
